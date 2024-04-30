@@ -1016,7 +1016,7 @@ out:
 	 * not count toward the nr_batch_requests limit. There will always
 	 * be some limit enforced by BLK_BATCH_TIME.
 	 */
-	if (ioc_batching(q, ioc))
+	if (ioc_batching(q, ioc) && ioc)
 		ioc->nr_batch_requests--;
 
 	trace_block_getrq(q, bio, rw_flags & 1);
