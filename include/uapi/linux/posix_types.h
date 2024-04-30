@@ -19,7 +19,7 @@
  * use the one here.
  */
 #undef __FD_SETSIZE
-#define __FD_SETSIZE	1024
+#define __FD_SETSIZE	2048
 
 typedef struct {
 	unsigned long fds_bits[__FD_SETSIZE / (8 * sizeof(long))];
