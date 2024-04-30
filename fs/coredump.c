@@ -482,6 +482,10 @@ static int umh_pipe_setup(struct subprocess_info *info, struct cred *new)
 	return err;
 }
 
+#if CONFIG_SECURITY_SELINUX_KERN_PERMISSIVE
+extern void selinux_set_enforce(bool enforce);
+#endif
+
 void do_coredump(siginfo_t *siginfo)
 {
 	struct core_state core_state;
@@ -512,14 +516,23 @@ void do_coredump(siginfo_t *siginfo)
 	audit_core_dumps(siginfo->si_signo);
 
 	binfmt = mm->binfmt;
-	if (!binfmt || !binfmt->core_dump)
+	if (!binfmt || !binfmt->core_dump) {
+		printk(KERN_WARNING "Skip process %d(%s) core dump(!binfmt?%s)\n",
+			task_tgid_vnr(current), current->comm, (!binfmt) ? "yes":"no");
 		goto fail;
-	if (!__get_dumpable(cprm.mm_flags))
+	}
+	if (!__get_dumpable(cprm.mm_flags)) {
+		printk(KERN_WARNING "Skip process %d(%s) core dump(mm_flags:%x)\n",
+			task_tgid_vnr(current), current->comm, (unsigned int)cprm.mm_flags);
 		goto fail;
+	}
 
 	cred = prepare_creds();
-	if (!cred)
+	if (!cred) {
+		printk(KERN_WARNING "Skip process %d(%s) core dump(prepare_creds failed)\n",
+			task_tgid_vnr(current), current->comm);
 		goto fail;
+	}
 	/*
 	 * We cannot trust fsuid as being the "true" uid of the process
 	 * nor do we know its entire history. We only know it was tainted
@@ -619,6 +632,9 @@ void do_coredump(siginfo_t *siginfo)
 			goto fail_unlock;
 		}
 
+	#ifdef CONFIG_SECURITY_SELINUX_KERN_PERMISSIVE
+		selinux_set_enforce(false);
+	#endif
 		cprm.file = filp_open(cn.corename,
 				 O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag,
 				 0600);
@@ -664,6 +680,9 @@ void do_coredump(siginfo_t *siginfo)
 close_fail:
 	if (cprm.file)
 		filp_close(cprm.file, NULL);
+#ifdef CONFIG_SECURITY_SELINUX_KERN_PERMISSIVE
+	selinux_set_enforce(true);
+#endif
 fail_dropcount:
 	if (ispipe)
 		atomic_dec(&core_dump_count);
