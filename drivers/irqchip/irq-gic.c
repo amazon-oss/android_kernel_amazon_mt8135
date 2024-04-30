@@ -706,6 +706,17 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
 	return 0;
 }
 
+void gic_register_sgi(unsigned int gic_nr, int irq)
+{
+	struct irq_desc *desc = irq_to_desc(irq);
+	if (desc)
+		desc->irq_data.hwirq = irq;
+	irq_set_chip_and_handler(irq, &gic_chip,
+				 handle_fasteoi_irq);
+	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+	irq_set_chip_data(irq, &gic_data[gic_nr]);
+}
+
 #ifdef CONFIG_SMP
 static int __cpuinit gic_secondary_init(struct notifier_block *nfb,
 					unsigned long action, void *hcpu)

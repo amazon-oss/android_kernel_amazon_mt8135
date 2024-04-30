@@ -181,6 +181,9 @@ int usb_add_function(struct usb_configuration *config,
 {
 	int	value = -EINVAL;
 
+	pr_debug("USB" "%s:\n", __func__);
+
+
 	DBG(config->cdev, "adding '%s'/%p to config '%s'/%p\n",
 			function->name, function,
 			config->label, config);
@@ -593,7 +596,7 @@ static void reset_config(struct usb_composite_dev *cdev)
 		bitmap_zero(f->endpoints, 32);
 	}
 	cdev->config = NULL;
-	cdev->delayed_status = 0;
+	cdev->delayed_status=0;
 }
 
 static int set_config(struct usb_composite_dev *cdev,
@@ -775,6 +778,9 @@ int usb_add_config(struct usb_composite_dev *cdev,
 			}
 		}
 		list_del(&config->list);
+		pr_debug(
+			"[USB]%s: bind fialed and the list should be init "
+			"because there is one entry only", __func__);
 		config->cdev = NULL;
 	} else {
 		unsigned	i;
@@ -812,7 +818,7 @@ done:
 }
 EXPORT_SYMBOL_GPL(usb_add_config);
 
-static void remove_config(struct usb_composite_dev *cdev,
+static void unbind_config(struct usb_composite_dev *cdev,
 			      struct usb_configuration *config)
 {
 	while (!list_empty(&config->functions)) {
@@ -827,7 +833,6 @@ static void remove_config(struct usb_composite_dev *cdev,
 			/* may free memory for "f" */
 		}
 	}
-	list_del(&config->list);
 	if (config->unbind) {
 		DBG(cdev, "unbind config '%s'/%p\n", config->label, config);
 		config->unbind(config);
@@ -854,9 +859,11 @@ void usb_remove_config(struct usb_composite_dev *cdev,
 	if (cdev->config == config)
 		reset_config(cdev);
 
+	list_del(&config->list);
+
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
-	remove_config(cdev, config);
+	unbind_config(cdev, config);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1198,13 +1205,15 @@ EXPORT_SYMBOL_GPL(usb_string_ids_n);
 
 /*-------------------------------------------------------------------------*/
 
-static void composite_setup_complete(struct usb_ep *ep, struct usb_request *req)
+void composite_setup_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	if (req->status || req->actual != req->length)
 		DBG((struct usb_composite_dev *) ep->driver_data,
 				"setup complete --> %d, %d/%d\n",
 				req->status, req->actual, req->length);
 }
+
+EXPORT_SYMBOL_GPL(composite_setup_complete);
 
 /*
  * The setup() callback implements all the ep0 functionality that's
@@ -1260,6 +1269,8 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 
 			value = min(w_length, (u16) sizeof cdev->desc);
 			memcpy(req->buf, &cdev->desc, value);
+			pr_debug("USB" "USB_REQ_GET_DESCRIPTOR: "
+							"USB_DT_DEVICE, value=%d\n",value);
 			break;
 		case USB_DT_DEVICE_QUALIFIER:
 			if (!gadget_is_dualspeed(gadget) ||
@@ -1268,8 +1279,12 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			device_qual(cdev);
 			value = min_t(int, w_length,
 				sizeof(struct usb_qualifier_descriptor));
+			pr_debug("USB" "USB_REQ_GET_DESCRIPTOR: "
+							"USB_DT_DEVICE_QUALIFIER, value=%d\n",value);
 			break;
 		case USB_DT_OTHER_SPEED_CONFIG:
+			pr_debug("USB" "USB_REQ_GET_DESCRIPTOR: "
+							"USB_DT_OTHER_SPEED_CONFIG\n");
 			if (!gadget_is_dualspeed(gadget) ||
 			    gadget->speed >= USB_SPEED_SUPER)
 				break;
@@ -1278,18 +1293,25 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			value = config_desc(cdev, w_value);
 			if (value >= 0)
 				value = min(w_length, (u16) value);
+			pr_debug("USB" "USB_REQ_GET_DESCRIPTOR: "
+							"USB_DT_CONFIG, value=%d\n",value);
 			break;
 		case USB_DT_STRING:
 			value = get_string(cdev, req->buf,
 					w_index, w_value & 0xff);
-			if (value >= 0)
+			if (value >= 0) {
 				value = min(w_length, (u16) value);
+				pr_debug("USB" "USB_REQ_GET_DESCRIPTOR: "
+						"USB_DT_STRING, value=%d\n" ,value);
+			}
 			break;
 		case USB_DT_BOS:
 			if (gadget_is_superspeed(gadget)) {
 				value = bos_desc(cdev);
 				value = min(w_length, (u16) value);
 			}
+			pr_debug("USB" "USB_REQ_GET_DESCRIPTOR: "
+						"USB_DT_BOS, value=%d\n",value);
 			break;
 		}
 		break;
@@ -1309,6 +1331,8 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		spin_lock(&cdev->lock);
 		value = set_config(cdev, ctrl, w_value);
 		spin_unlock(&cdev->lock);
+		pr_debug("USB" "USB_REQ_SET_CONFIGURATION: "
+						"value=%d\n",value);
 		break;
 	case USB_REQ_GET_CONFIGURATION:
 		if (ctrl->bRequestType != USB_DIR_IN)
@@ -1328,7 +1352,12 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			goto unknown;
 		if (!cdev->config || intf >= MAX_CONFIG_INTERFACES)
 			break;
+
+		if (cdev->config)
 		f = cdev->config->interface[intf];
+		else
+			printk("%s: cdev->config = NULL \n", __func__);
+
 		if (!f)
 			break;
 		if (w_value && !f->set_alt)
@@ -1476,6 +1505,12 @@ unknown:
 	}
 
 done:
+	if(value < 0) {
+		pr_debug(
+			"[USB]%s: value=%d, bRequestType=0x%x, bRequest=0x%x, "
+			"w_value=0x%x, w_length=0x%x\n", __func__, value,
+			ctrl->bRequestType, ctrl->bRequest, w_value, w_length);
+	}
 	/* device either stalls (value < 0) or reports success */
 	return value;
 }
@@ -1493,6 +1528,14 @@ void composite_disconnect(struct usb_gadget *gadget)
 		reset_config(cdev);
 	if (cdev->driver->disconnect)
 		cdev->driver->disconnect(cdev);
+
+	/* ALPS00235316 and ALPS00234976 */
+	/* reset the complet function */
+	if(cdev->req->complete)	{
+		pr_debug("USB" "%s:  reassign the complete function!!\n", __func__);
+		cdev->req->complete = composite_setup_complete;
+	}
+
 	spin_unlock_irqrestore(&cdev->lock, flags);
 }
 
@@ -1525,7 +1568,8 @@ static void __composite_unbind(struct usb_gadget *gadget, bool unbind_driver)
 		struct usb_configuration	*c;
 		c = list_first_entry(&cdev->configs,
 				struct usb_configuration, list);
-		remove_config(cdev, c);
+		list_del(&c->list);
+		unbind_config(cdev, c);
 	}
 	if (cdev->driver->unbind && unbind_driver)
 		cdev->driver->unbind(cdev);
@@ -1778,6 +1822,8 @@ int usb_composite_probe(struct usb_composite_driver *driver)
 
 	if (!driver || !driver->dev || !driver->bind)
 		return -EINVAL;
+
+	pr_debug("USB" "%s: driver->name = %s", __func__, driver->name);
 
 	if (!driver->name)
 		driver->name = "composite";

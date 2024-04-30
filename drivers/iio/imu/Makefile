@@ -12,4 +12,7 @@ adis_lib-$(CONFIG_IIO_ADIS_LIB_BUFFER) += adis_trigger.o
 adis_lib-$(CONFIG_IIO_ADIS_LIB_BUFFER) += adis_buffer.o
 obj-$(CONFIG_IIO_ADIS_LIB) += adis_lib.o
 
-obj-y += inv_mpu6050/
+obj-$(CONFIG_INVENSENSE_MPU6515) += inv_mpu6050/
+obj-$(CONFIG_INVENSENSE_MPU6515) += inv_mpu6515/
+obj-$(CONFIG_INVENSENSE_ICM20645) += inv_icm20645/
+obj-y += inv_test/
