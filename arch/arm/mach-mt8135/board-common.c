@@ -23,6 +23,7 @@
 #include <asm/mach/time.h>
 #include <asm/setup.h>
 #include <asm/atomic.h>
+#include <asm/system_misc.h>
 
 #include <mach/system.h>
 #include <mach/board.h>
