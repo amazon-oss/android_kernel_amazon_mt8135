@@ -27,6 +27,7 @@
 #include <linux/input/synaptics_dsx_s7508.h>
 #include "synaptics_dsx_core.h"
 
+extern unsigned int system_type;
 
 #define DO_STARTUP_FW_UPDATE
 
