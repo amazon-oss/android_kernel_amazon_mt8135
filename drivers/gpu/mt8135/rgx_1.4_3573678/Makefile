@@ -5,13 +5,11 @@ OPTIM = -Os
 RGX_BVNC = 1.48.2.0
 RGX_TOP := $(srctree)/drivers/gpu/$(MTK_PLATFORM)/rgx_1.4_3573678
 
-VER := $(if $(filter eng,$(TARGET_BUILD_VARIANT)),eng,user)
+VER := user
 
 ccflags-y += -include $(RGX_TOP)/include/config_kernel_$(VER).h
 
-ifeq ($(strip $(TARGET_BUILD_VARIANT)),eng)
-PVR_RI_DEBUG := 1
-endif
+PVR_RI_DEBUG := 0
 
 ifeq ($(PVR_RI_DEBUG),1)
 pvrsrvkm-y += \
