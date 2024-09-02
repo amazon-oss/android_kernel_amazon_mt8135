@@ -9,7 +9,7 @@
 
 #ifdef CONFIG_SDIOAUTOK_SUPPORT
 #define MTK_HIF_SDIO_AUTOK_ENABLED 1
-extern int wait_sdio_autok_ready(void *);
+extern void wait_sdio_autok_ready(void *);
 #else
 #define MTK_HIF_SDIO_AUTOK_ENABLED 0
 #endif
