@@ -138,8 +138,6 @@ source "drivers/staging/netlogic/Kconfig"
 
 source "drivers/staging/dwc2/Kconfig"
 
-source "drivers/staging/trapz/Kconfig"
-
 source "drivers/staging/amazon/Kconfig"
 
 endif # STAGING

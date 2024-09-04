@@ -232,16 +232,6 @@ _AddEntryToPool(struct page *psPage, IMG_UINT32 ui32CPUCacheFlags)
 	g_ui32PagePoolEntryCount++;
 	_PagePoolUnlock();
 
-/* ACOS_MOD_BEGIN {internal_membo} */
-#ifdef CONFIG_TRAPZ_PVA
-	/* clear the PID details on entry into the free pool */
-	if (psPage) {
-		psPage->detail.allocation_pid = 0;
-		psPage->detail.last_mapper_pid = 0;
-	}
-#endif
-/* ACOS_MOD_END {internal_membo} */
-
 	return IMG_TRUE;
 }
 
@@ -651,16 +641,6 @@ _AllocOSPage(IMG_UINT32 ui32CPUCacheFlags,
 				and thus we have to give the page back to the OS.
 			*/
 			*pbUnsetMemoryType = IMG_TRUE;
-
-/* ACOS_MOD_BEGIN {internal_membo} */
-#ifdef CONFIG_TRAPZ_PVA
-			/* mark allocation pid */
-			struct task_struct *cur_task;
-			cur_task = current;
-			if (cur_task)
-				psPage->detail.allocation_pid = cur_task->tgid;
-#endif
-/* ACOS_MOD_END {internal_membo} */
 		}
 	}
 

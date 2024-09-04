@@ -206,11 +206,8 @@ get_write_lock:
 			/* mmap_region may free vma; grab the info now */
 			vm_flags = vma->vm_flags;
 
-#ifdef CONFIG_TRAPZ_PVA
-			addr = mmap_region(file, start, size, vm_flags, pgoff, flags);
-#else
 			addr = mmap_region(file, start, size, vm_flags, pgoff);
-#endif
+
 			fput(file);
 			if (IS_ERR_VALUE(addr)) {
 				err = addr;

@@ -900,11 +900,6 @@ out:
 		 * migrated will have kepts its references and be
 		 * restored.
 		 */
-/* ACOS_MOD_BEGIN {internal_membo} */
-#ifdef CONFIG_TRAPZ_PVA
-		newpage->detail = page->detail;
-#endif
-/* ACOS_MOD_END {internal_membo} */
 		list_del(&page->lru);
 		dec_zone_page_state(page, NR_ISOLATED_ANON +
 				    page_is_file_cache(page));

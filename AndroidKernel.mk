@@ -93,16 +93,9 @@ kernel: $(INSTALLED_KERNEL_TARGET)
 
 kernel-defconfig: $(TARGET_KERNEL_CONFIG)
 
-$(TARGET_KERNEL_CONFIG): | $(KERNEL_OUT) $(KERNEL_OUT)/include/generated/trapz_generated_kernel.h
+$(TARGET_KERNEL_CONFIG): | $(KERNEL_OUT)
 	mkdir -p $(KERNEL_OUT)
 	$(MAKE) $(KERNEL_MAKEFLAGS) $(KERNEL_DEFCONFIG)
-# ACOS_MOD_BEGIN {internal_membo}
-ifeq ($(USER_DEBUG_PVA), 1)
-	cat $(KERNEL_DIR)/arch/arm/configs/trapz_pva.config >> $@
-else
-	cat $(KERNEL_DIR)/arch/arm/configs/trapz.config >> $@
-endif
-# ACOS_MOD_END {internal_membo}
 	$(MAKE) $(KERNEL_MAKEFLAGS) oldconfig
 
 $(KERNEL_HEADERS_INSTALL): $(TARGET_KERNEL_CONFIG) | $(KERNEL_OUT)
