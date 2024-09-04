@@ -30,7 +30,7 @@
 #include <linux/perf_event.h>
 
 int watchdog_enabled = 1;
-int __read_mostly watchdog_thresh = 10;
+int __read_mostly watchdog_thresh = 4;
 static int __read_mostly watchdog_disabled;
 static u64 __read_mostly sample_period;
 
@@ -224,6 +224,8 @@ static int is_hardlockup_other_cpu(unsigned int cpu)
 	return 0;
 }
 
+extern void mtk_wdt_set_irq_affinity(int cpu);
+
 static void watchdog_check_hardlockup_other_cpu(void)
 {
 	unsigned int next_cpu;
@@ -253,10 +255,14 @@ static void watchdog_check_hardlockup_other_cpu(void)
 		if (per_cpu(hard_watchdog_warn, next_cpu) == true)
 			return;
 
+		mtk_wdt_set_irq_affinity(next_cpu);
+
 		if (hardlockup_panic)
 			panic("Watchdog detected hard LOCKUP on cpu %u", next_cpu);
-		else
+		else {
 			WARN(1, "Watchdog detected hard LOCKUP on cpu %u", next_cpu);
+			WARN(1, "Routed watchdog IRQ/FIQ to cpu %u!", next_cpu);
+		}
 
 		per_cpu(hard_watchdog_warn, next_cpu) = true;
 	} else {
@@ -336,6 +342,10 @@ static void watchdog_interrupt_count(void)
 static int watchdog_nmi_enable(unsigned int cpu);
 static void watchdog_nmi_disable(unsigned int cpu);
 
+#ifdef CONFIG_MT_SCHED_MONITOR
+extern void dump_sched_traces(void);
+#endif
+
 /* watchdog kicker functions */
 static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 {
@@ -400,6 +410,15 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 			show_regs(regs);
 		else
 			dump_stack();
+
+	#ifdef CONFIG_MT_SCHED_MONITOR
+		/*
+		 * Dump stat info for IRQ, tasklet etc.
+		 * That may help to narrow down the root cause
+		 * for some comlicated soft lockup cases.
+		 */
+		dump_sched_traces();
+	#endif
 
 		if (softlockup_panic)
 			panic("softlockup: hung tasks");

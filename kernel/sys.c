@@ -65,6 +65,18 @@
 #include <asm/io.h>
 #include <asm/unistd.h>
 
+#ifdef CONFIG_MDUMP
+#include <linux/mdump.h>
+#endif
+
+#ifdef CONFIG_MT_PRIO_TRACER
+# include <linux/prio_tracer.h>
+#endif
+
+#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
+#include <linux/sign_of_life.h>
+#endif
+
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a,b)	(-EINVAL)
 #endif
@@ -173,7 +185,11 @@ static int set_one_prio(struct task_struct *p, int niceval, int error)
 	}
 	if (error == -ESRCH)
 		error = 0;
+#ifdef CONFIG_MT_PRIO_TRACER
+	set_user_nice_syscall(p, niceval);
+#else
 	set_user_nice(p, niceval);
+#endif
 out:
 	return error;
 }
@@ -406,6 +422,9 @@ void kernel_restart(char *cmd)
 	else
 		printk(KERN_EMERG "Restarting system with command '%s'.\n", cmd);
 	kmsg_dump(KMSG_DUMP_RESTART);
+#ifdef CONFIG_MDUMP
+	mdump_mark_reboot_reason(MDUMP_REBOOT_NORMAL);
+#endif
 	machine_restart(cmd);
 }
 EXPORT_SYMBOL_GPL(kernel_restart);
@@ -442,6 +461,9 @@ EXPORT_SYMBOL_GPL(kernel_halt);
  */
 void kernel_power_off(void)
 {
+#ifdef CONFIG_MDUMP
+	mdump_mark_reboot_reason(MDUMP_COLD_RESET);
+#endif
 	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
 	if (pm_power_off_prepare)
 		pm_power_off_prepare();
@@ -517,11 +539,17 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 		panic("cannot halt");
 
 	case LINUX_REBOOT_CMD_POWER_OFF:
+#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
+		life_cycle_set_shutdown_reason(SHUTDOWN_BY_SW);
+#endif
 		kernel_power_off();
 		do_exit(0);
 		break;
 
 	case LINUX_REBOOT_CMD_RESTART2:
+#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
+		life_cycle_set_boot_reason(WARMBOOT_BY_SW);
+#endif
 		if (strncpy_from_user(&buffer[0], arg, sizeof(buffer) - 1) < 0) {
 			ret = -EFAULT;
 			break;
@@ -2102,7 +2130,7 @@ static int prctl_get_tid_address(struct task_struct *me, int __user **tid_addr)
 }
 #endif
 
-#ifdef CONFIG_MMU
+
 static int prctl_update_vma_anon_name(struct vm_area_struct *vma,
 		struct vm_area_struct **prev,
 		unsigned long start, unsigned long end,
@@ -2241,13 +2269,6 @@ static int prctl_set_vma(unsigned long opt, unsigned long start,
 
 	return error;
 }
-#else /* CONFIG_MMU */
-static int prctl_set_vma(unsigned long opt, unsigned long start,
-		unsigned long len_in, unsigned long arg)
-{
-	return -EINVAL;
-}
-#endif
 
 SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		unsigned long, arg4, unsigned long, arg5)
@@ -2455,7 +2476,7 @@ SYSCALL_DEFINE3(getcpu, unsigned __user *, cpup, unsigned __user *, nodep,
 	return err ? -EFAULT : 0;
 }
 
-char poweroff_cmd[POWEROFF_CMD_PATH_LEN] = "/sbin/poweroff";
+char poweroff_cmd[POWEROFF_CMD_PATH_LEN] = "/system/bin/reboot -p";
 
 static int __orderly_poweroff(bool force)
 {
@@ -2516,6 +2537,63 @@ int orderly_poweroff(bool force)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(orderly_poweroff);
+
+char reboot_cmd[POWEROFF_CMD_PATH_LEN] = "/system/bin/reboot";
+
+static int __orderly_reboot(bool force)
+{
+	char **argv;
+	static char *envp[] = {
+		"HOME=/",
+		"PATH=/sbin:/bin:/usr/sbin:/usr/bin",
+		NULL
+	};
+	int ret;
+
+	argv = argv_split(GFP_KERNEL, reboot_cmd, NULL);
+	if (argv) {
+		ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
+		argv_free(argv);
+	} else {
+		printk(KERN_WARNING "%s failed to allocate memory for \"%s\"\n",
+					 __func__, reboot_cmd);
+		ret = -ENOMEM;
+	}
+
+	if (ret && force) {
+		printk(KERN_WARNING "Failed to start orderly reboot: "
+					"forcing the issue\n");
+		emergency_sync();
+		kernel_restart(NULL);
+	}
+
+	return ret;
+}
+
+static bool reboot_force;
+
+static void reboot_work_func(struct work_struct *work)
+{
+	__orderly_reboot(reboot_force);
+}
+
+static DECLARE_WORK(reboot_work, reboot_work_func);
+
+/**
+ * orderly_reboot - Trigger an orderly system reboot
+ * @force: force reboot if command execution fails
+ *
+ * This may be called from any context to trigger a system reboot.
+ * If the orderly reboot fails, it will force an immediate reboot.
+ */
+int orderly_reboot(bool force)
+{
+	if (force) /* do not override the pending "true" */
+		reboot_force = true;
+	schedule_work(&reboot_work);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(orderly_reboot);
 
 /**
  * do_sysinfo - fill in sysinfo struct

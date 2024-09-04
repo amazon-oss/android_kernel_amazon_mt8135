@@ -32,12 +32,20 @@
 #include "power.h"
 
 struct pm_sleep_state pm_states[PM_SUSPEND_MAX] = {
+//<20130327> <marc.huang> merge from android kernel 3.0 - add [PM_SUSPEND_ON] into pm_states
+#ifdef CONFIG_EARLYSUSPEND
+	[PM_SUSPEND_ON]		= { .label = "on", },
+#endif
 	[PM_SUSPEND_FREEZE] = { .label = "freeze", .state = PM_SUSPEND_FREEZE },
 	[PM_SUSPEND_STANDBY] = { .label = "standby", },
 	[PM_SUSPEND_MEM] = { .label = "mem", },
 };
 
 static const struct platform_suspend_ops *suspend_ops;
+
+#ifdef CONFIG_PM_STATS_SUPPORT
+extern u64 pm_accumulate_time(ktime_t starttime);
+#endif
 
 static bool need_suspend_ops(suspend_state_t state)
 {
@@ -64,7 +72,7 @@ void freeze_wake(void)
 }
 EXPORT_SYMBOL_GPL(freeze_wake);
 
-static bool valid_state(suspend_state_t state)
+bool valid_state(suspend_state_t state)
 {
 	/*
 	 * PM_SUSPEND_STANDBY and PM_SUSPEND_MEM states need low level
@@ -73,6 +81,7 @@ static bool valid_state(suspend_state_t state)
 	 */
 	return suspend_ops && suspend_ops->valid && suspend_ops->valid(state);
 }
+EXPORT_SYMBOL_GPL(valid_state);
 
 /**
  * suspend_set_ops - Set the global suspend method table.
@@ -127,6 +136,9 @@ static int suspend_test(int level)
 static int suspend_prepare(suspend_state_t state)
 {
 	int error;
+#ifdef CONFIG_PM_STATS_SUPPORT
+    ktime_t time; 
+#endif
 
 	if (need_suspend_ops(state) && (!suspend_ops || !suspend_ops->enter))
 		return -EPERM;
@@ -137,7 +149,18 @@ static int suspend_prepare(suspend_state_t state)
 	if (error)
 		goto Finish;
 
+#ifdef CONFIG_PM_STATS_SUPPORT
+    time = ktime_get();
+    pm_stats.normal += pm_accumulate_time(pm_stats.time);
+    pm_stats.time = ktime_get();
+    pm_stats.suspending = 1;
+#endif
+
 	error = suspend_freeze_processes();
+#ifdef CONFIG_PM_STATS_SUPPORT
+    pm_trans.freeze++;
+    pm_stats.freeze += pm_accumulate_time(time);
+#endif		
 	if (!error)
 		return 0;
 	log_suspend_abort_reason("One or more tasks refusing to freeze");
@@ -263,6 +286,10 @@ int suspend_devices_and_enter(suspend_state_t state)
 	if (need_suspend_ops(state) && !suspend_ops)
 		return -ENOSYS;
 
+#ifdef CONFIG_TOI
+	drop_pagecache();
+#endif 
+
 	trace_machine_suspend(state);
 	if (need_suspend_ops(state) && suspend_ops->begin) {
 		error = suspend_ops->begin(state);
@@ -304,6 +331,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 		suspend_ops->recover();
 	goto Resume_devices;
 }
+EXPORT_SYMBOL_GPL(suspend_devices_and_enter);
 
 /**
  * suspend_finish - Clean up before finishing the suspend sequence.
@@ -326,7 +354,8 @@ static void suspend_finish(void)
  * Fail if that's not the case.  Otherwise, prepare for system suspend, make the
  * system enter the given sleep state and clean up after wakeup.
  */
-static int enter_state(suspend_state_t state)
+//<20130327> <marc.huang> merge from android kernel 3.0 - modify enter_state function to non-static
+int enter_state(suspend_state_t state)
 {
 	int error;
 

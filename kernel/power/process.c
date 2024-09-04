@@ -22,6 +22,8 @@
  * Timeout for stopping processes
  */
 unsigned int __read_mostly freeze_timeout_msecs = 20 * MSEC_PER_SEC;
+bool show_task_flag = false;
+module_param(show_task_flag, bool, 0644);
 
 static int try_to_freeze_tasks(bool user_only)
 {
@@ -34,9 +36,7 @@ static int try_to_freeze_tasks(bool user_only)
 	unsigned int elapsed_msecs;
 	bool wakeup = false;
 	int sleep_usecs = USEC_PER_MSEC;
-#ifdef CONFIG_PM_SLEEP
 	char suspend_abort[MAX_SUSPEND_ABORT_LEN];
-#endif
 
 	do_gettimeofday(&start);
 
@@ -66,11 +66,9 @@ static int try_to_freeze_tasks(bool user_only)
 			break;
 
 		if (pm_wakeup_pending()) {
-#ifdef CONFIG_PM_SLEEP
 			pm_get_active_wakeup_sources(suspend_abort,
 				MAX_SUSPEND_ABORT_LEN);
 			log_suspend_abort_reason(suspend_abort);
-#endif
 			wakeup = true;
 			break;
 		}
@@ -116,6 +114,23 @@ static int try_to_freeze_tasks(bool user_only)
 	return todo ? -EBUSY : 0;
 }
 
+unsigned int pf_freezer_skip = PF_FREEZER_SKIP;
+
+void freeze_remove_flag_freezer_skip(void)
+{
+	struct task_struct *g, *p;
+
+	/* Prohibit future management of this flag. */
+	pf_freezer_skip = 0;
+
+	/* Remove all PF_FREEZER_SKIP flags */
+	read_lock(&tasklist_lock);
+	do_each_thread(g, p) {
+		p->flags &= ~PF_FREEZER_SKIP;
+	} while_each_thread(g, p);
+	read_unlock(&tasklist_lock);
+}
+
 /*
  * Returns true if all freezable tasks (except for current) are frozen already
  */
@@ -143,7 +158,7 @@ done:
  *
  * On success, returns 0.  On failure, -errno and system is fully thawed.
  */
-int freeze_processes(void)
+int freeze_processes(int force)
 {
 	int error;
 	int oom_kills_saved;
@@ -181,10 +196,11 @@ done:
 	printk("\n");
 	BUG_ON(in_atomic());
 
-	if (error)
+	if (!force && error)
 		thaw_processes();
 	return error;
 }
+EXPORT_SYMBOL_GPL(freeze_processes);
 
 /**
  * freeze_kernel_threads - Make freezable kernel threads go to the refrigerator.
@@ -211,6 +227,7 @@ int freeze_kernel_threads(void)
 		thaw_kernel_threads();
 	return error;
 }
+EXPORT_SYMBOL_GPL(freeze_kernel_threads);
 
 void thaw_processes(void)
 {
@@ -239,6 +256,7 @@ void thaw_processes(void)
 	schedule();
 	printk("done.\n");
 }
+EXPORT_SYMBOL_GPL(thaw_processes);
 
 void thaw_kernel_threads(void)
 {
@@ -259,3 +277,4 @@ void thaw_kernel_threads(void)
 	schedule();
 	printk("done.\n");
 }
+EXPORT_SYMBOL_GPL(thaw_kernel_threads);
