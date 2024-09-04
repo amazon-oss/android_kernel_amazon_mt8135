@@ -23,6 +23,11 @@
 #include <linux/slab.h>
 #include "ion_priv.h"
 
+static struct kmem_cache *item_cache;
+static DEFINE_MUTEX(item_mutex);
+static struct list_head items = LIST_HEAD_INIT(items);
+#define MAX_ITEM_COUNT ((2 * PAGE_SIZE) / sizeof(struct ion_page_pool_item) - 1)
+
 struct ion_page_pool_item {
 	struct page *page;
 	struct list_head list;
@@ -34,13 +39,11 @@ static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
 
 	if (!page)
 		return NULL;
-	ion_pages_sync_for_device(NULL, page, PAGE_SIZE << pool->order,
-						DMA_BIDIRECTIONAL);
+	ion_pages_sync_for_device(NULL, page, PAGE_SIZE << pool->order, DMA_BIDIRECTIONAL);
 	return page;
 }
 
-static void ion_page_pool_free_pages(struct ion_page_pool *pool,
-				     struct page *page)
+static void ion_page_pool_free_pages(struct ion_page_pool *pool, struct page *page)
 {
 	__free_pages(page, pool->order);
 }
@@ -49,7 +52,7 @@ static int ion_page_pool_add(struct ion_page_pool *pool, struct page *page)
 {
 	struct ion_page_pool_item *item;
 
-	item = kmalloc(sizeof(struct ion_page_pool_item), GFP_KERNEL);
+	item = kmem_cache_alloc(item_cache, GFP_KERNEL);
 	if (!item)
 		return -ENOMEM;
 
@@ -73,19 +76,17 @@ static struct page *ion_page_pool_remove(struct ion_page_pool *pool, bool high)
 
 	if (high) {
 		BUG_ON(!pool->high_count);
-		item = list_first_entry(&pool->high_items,
-					struct ion_page_pool_item, list);
+		item = list_first_entry(&pool->high_items, struct ion_page_pool_item, list);
 		pool->high_count--;
 	} else {
 		BUG_ON(!pool->low_count);
-		item = list_first_entry(&pool->low_items,
-					struct ion_page_pool_item, list);
+		item = list_first_entry(&pool->low_items, struct ion_page_pool_item, list);
 		pool->low_count--;
 	}
 
 	list_del(&item->list);
 	page = item->page;
-	kfree(item);
+	kmem_cache_free(item_cache, item);
 	return page;
 }
 
@@ -122,13 +123,11 @@ static int ion_page_pool_total(struct ion_page_pool *pool, bool high)
 	int total = 0;
 
 	total += high ? (pool->high_count + pool->low_count) *
-		(1 << pool->order) :
-			pool->low_count * (1 << pool->order);
+	    (1 << pool->order) : pool->low_count * (1 << pool->order);
 	return total;
 }
 
-int ion_page_pool_shrink(struct ion_page_pool *pool, gfp_t gfp_mask,
-				int nr_to_scan)
+int ion_page_pool_shrink(struct ion_page_pool *pool, gfp_t gfp_mask, int nr_to_scan)
 {
 	int i;
 	bool high;
@@ -179,12 +178,17 @@ void ion_page_pool_destroy(struct ion_page_pool *pool)
 
 static int __init ion_page_pool_init(void)
 {
+	item_cache = kmem_cache_create("ion_page_pool_items",
+				       sizeof(struct ion_page_pool_item),
+				       0, SLAB_HWCACHE_ALIGN, NULL);
+	if (!item_cache)
+		return -ENOMEM;
 	return 0;
 }
 
 static void __exit ion_page_pool_exit(void)
 {
+	kmem_cache_destroy(item_cache);
 }
-
 module_init(ion_page_pool_init);
 module_exit(ion_page_pool_exit);

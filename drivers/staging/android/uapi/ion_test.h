@@ -67,4 +67,4 @@ struct ion_test_rw_data {
 			_IOW(ION_IOC_MAGIC, 0xf2, struct ion_test_rw_data)
 
 
-#endif /* _UAPI_LINUX_ION_H */
+#endif				/* _UAPI_LINUX_ION_H */

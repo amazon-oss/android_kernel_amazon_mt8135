@@ -42,7 +42,7 @@ struct ion_test_data {
 };
 
 static int ion_handle_test_dma(struct device *dev, struct dma_buf *dma_buf,
-		void __user *ptr, size_t offset, size_t size, bool write)
+			       void __user *ptr, size_t offset, size_t size, bool write)
 {
 	int ret = 0;
 	struct dma_buf_attachment *attach;
@@ -91,14 +91,14 @@ static int ion_handle_test_dma(struct device *dev, struct dma_buf *dma_buf,
 		offset = 0;
 	}
 
-err:
+ err:
 	dma_buf_unmap_attachment(attach, table, dir);
 	dma_buf_detach(dma_buf, attach);
 	return ret;
 }
 
 static int ion_handle_test_kernel(struct dma_buf *dma_buf, void __user *ptr,
-		size_t offset, size_t size, bool write)
+				  size_t offset, size_t size, bool write)
 {
 	int ret;
 	unsigned long page_offset = offset >> PAGE_SHIFT;
@@ -138,13 +138,12 @@ static int ion_handle_test_kernel(struct dma_buf *dma_buf, void __user *ptr,
 		page_offset++;
 		copy_offset = 0;
 	}
-err:
+ err:
 	dma_buf_end_cpu_access(dma_buf, offset, size, dir);
 	return ret;
 }
 
-static long ion_test_ioctl(struct file *filp, unsigned int cmd,
-						unsigned long arg)
+static long ion_test_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct ion_test_data *test_data = filp->private_data;
 	int ret = 0;
@@ -162,36 +161,36 @@ static long ion_test_ioctl(struct file *filp, unsigned int cmd,
 
 	switch (cmd) {
 	case ION_IOC_TEST_SET_FD:
-	{
-		struct dma_buf *dma_buf = NULL;
-		int fd = arg;
+		{
+			struct dma_buf *dma_buf = NULL;
+			int fd = arg;
 
-		if (fd >= 0) {
-			dma_buf = dma_buf_get((int)arg);
-			if (IS_ERR(dma_buf))
-				return PTR_ERR(dma_buf);
+			if (fd >= 0) {
+				dma_buf = dma_buf_get((int)arg);
+				if (IS_ERR(dma_buf))
+					return PTR_ERR(dma_buf);
+			}
+			if (test_data->dma_buf)
+				dma_buf_put(test_data->dma_buf);
+			test_data->dma_buf = dma_buf;
+			break;
 		}
-		if (test_data->dma_buf)
-			dma_buf_put(test_data->dma_buf);
-		test_data->dma_buf = dma_buf;
-		break;
-	}
 	case ION_IOC_TEST_DMA_MAPPING:
-	{
-		ret = ion_handle_test_dma(test_data->dev, test_data->dma_buf,
-					u64_to_uptr(data.test_rw.ptr),
-					data.test_rw.offset, data.test_rw.size,
-					data.test_rw.write);
-		break;
-	}
+		{
+			ret = ion_handle_test_dma(test_data->dev, test_data->dma_buf,
+						  u64_to_uptr(data.test_rw.ptr),
+						  data.test_rw.offset, data.test_rw.size,
+						  data.test_rw.write);
+			break;
+		}
 	case ION_IOC_TEST_KERNEL_MAPPING:
-	{
-		ret = ion_handle_test_kernel(test_data->dma_buf,
-					u64_to_uptr(data.test_rw.ptr),
-					data.test_rw.offset, data.test_rw.size,
-					data.test_rw.write);
-		break;
-	}
+		{
+			ret = ion_handle_test_kernel(test_data->dma_buf,
+						     u64_to_uptr(data.test_rw.ptr),
+						     data.test_rw.offset, data.test_rw.size,
+						     data.test_rw.write);
+			break;
+		}
 	default:
 		return -ENOTTY;
 	}
@@ -241,8 +240,7 @@ static int __init ion_test_probe(struct platform_device *pdev)
 	int ret;
 	struct ion_test_device *testdev;
 
-	testdev = devm_kzalloc(&pdev->dev, sizeof(struct ion_test_device),
-				GFP_KERNEL);
+	testdev = devm_kzalloc(&pdev->dev, sizeof(struct ion_test_device), GFP_KERNEL);
 	if (!testdev)
 		return -ENOMEM;
 
@@ -263,8 +261,8 @@ static int __init ion_test_probe(struct platform_device *pdev)
 
 static struct platform_driver ion_test_platform_driver = {
 	.driver = {
-		.name = "ion-test",
-	},
+		   .name = "ion-test",
+		   },
 };
 
 static int __init ion_test_init(void)
@@ -277,6 +275,5 @@ static void __exit ion_test_exit(void)
 {
 	platform_driver_unregister(&ion_test_platform_driver);
 }
-
 module_init(ion_test_init);
 module_exit(ion_test_exit);

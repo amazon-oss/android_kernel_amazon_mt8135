@@ -30,14 +30,20 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/smp.h>
+#include <linux/sysrq.h>
 #include <linux/timer.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/wakelock.h>
 
+#include <asm/fiq_debugger.h>
+#include <asm/fiq.h>
 #ifdef CONFIG_FIQ_GLUE
 #include <asm/fiq_glue.h>
 #endif
+
+#include <mach/system.h>
+#include <mach/irqs.h>
 
 #include <linux/uaccess.h>
 
@@ -49,6 +55,12 @@
 #define MAX_UNHANDLED_FIQ_COUNT 1000000
 
 #define MAX_FIQ_DEBUGGER_PORTS 4
+
+#define THREAD_INFO(sp) ((struct thread_info *) \
+		((unsigned long)(sp) & ~(THREAD_SIZE - 1)))
+
+extern int mt_fiq_init(void *arg);
+extern irqreturn_t mt_debug_signal_irq(int irq, void *dev_id);
 
 struct fiq_debugger_state {
 #ifdef CONFIG_FIQ_GLUE
@@ -395,7 +407,7 @@ static void fiq_debugger_work(struct work_struct *work)
 		cmd += 6;
 		while (*cmd == ' ')
 			cmd++;
-		if (cmd != '\0')
+		if ((cmd != '\0') && sysrq_on())
 			kernel_restart(cmd);
 		else
 			kernel_restart(NULL);
@@ -425,29 +437,37 @@ static void fiq_debugger_irq_exec(struct fiq_debugger_state *state, char *cmd)
 static void fiq_debugger_help(struct fiq_debugger_state *state)
 {
 	fiq_debugger_printf(&state->output,
-				"FIQ Debugger commands:\n"
-				" pc            PC status\n"
-				" regs          Register dump\n"
-				" allregs       Extended Register dump\n"
-				" bt            Stack trace\n"
-				" reboot [<c>]  Reboot with command <c>\n"
-				" reset [<c>]   Hard reset with command <c>\n"
-				" irqs          Interupt status\n"
-				" kmsg          Kernel log\n"
-				" version       Kernel version\n");
+			"FIQ Debugger commands:\n");
+	if (sysrq_on()) {
+		fiq_debugger_printf(&state->output,
+			" pc            PC status\n"
+			" regs          Register dump\n"
+			" allregs       Extended Register dump\n"
+			" bt            Stack trace\n");
+		fiq_debugger_printf(&state->output,
+			" reboot [<c>]  Reboot with command <c>\n"
+			" irqs          Interupt status\n"
+			" kmsg          Kernel log\n"
+			" version       Kernel version\n");
+		fiq_debugger_printf(&state->output,
+			" cpu           Current CPU\n"
+			" cpu <number>  Switch to CPU<number>\n"
+			" sysrq         sysrq options\n"
+			" sysrq <param> Execute sysrq with <param>\n");
+	} else {
+		fiq_debugger_printf(&state->output,
+			" reboot [<c>]  Reboot with command <c>\n"
+			" irqs          Interupt status\n");
+	}
 	fiq_debugger_printf(&state->output,
-				" sleep         Allow sleep while in FIQ\n"
-				" nosleep       Disable sleep while in FIQ\n"
-				" console       Switch terminal to console\n"
-				" cpu           Current CPU\n"
-				" cpu <number>  Switch to CPU<number>\n");
-	fiq_debugger_printf(&state->output,
-				" ps            Process list\n"
-				" sysrq         sysrq options\n"
-				" sysrq <param> Execute sysrq with <param>\n");
+			" sleep         Allow sleep while in FIQ\n"
+			" nosleep       Disable sleep while in FIQ\n"
+			" console       Switch terminal to console\n"
+			" ps            Process list\n");
 #ifdef CONFIG_KGDB
-	fiq_debugger_printf(&state->output,
-				" kgdb          Enter kernel debugger\n");
+	if (fiq_kgdb_enable) {
+		fiq_debugger_printf(&state->output,
+			" kgdb          Enter kernel debugger\n");
 #endif
 }
 
@@ -486,6 +506,7 @@ static bool fiq_debugger_fiq_exec(struct fiq_debugger_state *state,
 		fiq_debugger_dump_allregs(&state->output, regs);
 	} else if (!strcmp(cmd, "bt")) {
 		fiq_debugger_dump_stacktrace(&state->output, regs, 100, svc_sp);
+#if 0   /* cannot support the reset command due to the empty context */
 	} else if (!strncmp(cmd, "reset", 5)) {
 		cmd += 5;
 		while (*cmd == ' ')
@@ -497,12 +518,16 @@ static bool fiq_debugger_fiq_exec(struct fiq_debugger_state *state,
 		} else {
 			machine_restart(NULL);
 		}
+#endif
 	} else if (!strcmp(cmd, "irqs")) {
 		fiq_debugger_dump_irqs(state);
 	} else if (!strcmp(cmd, "kmsg")) {
-		fiq_debugger_dump_kernel_log(state);
+		if (sysrq_on())
+			fiq_debugger_dump_kernel_log(state);
 	} else if (!strcmp(cmd, "version")) {
-		fiq_debugger_printf(&state->output, "%s\n", linux_banner);
+		if (sysrq_on())
+			fiq_debugger_printf(&state->output, "%s\n",
+					    linux_banner);
 	} else if (!strcmp(cmd, "sleep")) {
 		state->no_sleep = false;
 		fiq_debugger_printf(&state->output, "enabling sleep\n");
@@ -514,14 +539,17 @@ static bool fiq_debugger_fiq_exec(struct fiq_debugger_state *state,
 		fiq_debugger_uart_flush(state);
 		state->console_enable = true;
 	} else if (!strcmp(cmd, "cpu")) {
-		fiq_debugger_printf(&state->output, "cpu %d\n", state->current_cpu);
-	} else if (!strncmp(cmd, "cpu ", 4)) {
+		if (sysrq_on())
+			fiq_debugger_printf(&state->output, "cpu %d\n",
+					    state->current_cpu);
+	} else if (!strncmp(cmd, "cpu ", 4) && sysrq_on()) {
 		unsigned long cpu = 0;
 		if (strict_strtoul(cmd + 4, 10, &cpu) == 0)
 			fiq_debugger_switch_cpu(state, cpu);
 		else
 			fiq_debugger_printf(&state->output, "invalid cpu\n");
-		fiq_debugger_printf(&state->output, "cpu %d\n", state->current_cpu);
+		fiq_debugger_printf(&state->output, "cpu %d\n",
+				    state->current_cpu);
 	} else {
 		if (state->debug_busy) {
 			fiq_debugger_printf(&state->output,
@@ -589,6 +617,7 @@ static irqreturn_t fiq_debugger_wakeup_irq_handler(int irq, void *dev)
 	return IRQ_HANDLED;
 }
 
+#if 0
 static
 void fiq_debugger_handle_console_irq_context(struct fiq_debugger_state *state)
 {
@@ -606,9 +635,11 @@ void fiq_debugger_handle_console_irq_context(struct fiq_debugger_state *state)
 	}
 #endif
 }
+#endif
 
 static void fiq_debugger_handle_irq_context(struct fiq_debugger_state *state)
 {
+#if 0
 	if (!state->no_sleep) {
 		unsigned long flags;
 
@@ -618,6 +649,7 @@ static void fiq_debugger_handle_irq_context(struct fiq_debugger_state *state)
 		spin_unlock_irqrestore(&state->sleep_timer_lock, flags);
 	}
 	fiq_debugger_handle_console_irq_context(state);
+#endif
 	if (state->debug_busy) {
 		fiq_debugger_irq_exec(state, state->debug_cmd);
 		if (!state->console_enable)
@@ -737,6 +769,17 @@ static void fiq_debugger_fiq(struct fiq_glue_handler *h,
 		fiq_debugger_force_irq(state);
 }
 #endif
+
+int is_fiq_debug_console_enable(void *argv)
+{
+    struct fiq_debugger_state *state = (struct fiq_debugger_state *)argv;
+
+    if (state->console_enable) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
 
 /*
  * When not using FIQs, we only use this single interrupt as an entry point.
@@ -916,6 +959,7 @@ static const struct tty_operations fiq_tty_driver_ops = {
 #endif
 };
 
+#if 0
 static int fiq_debugger_tty_init(void)
 {
 	int ret;
@@ -1005,6 +1049,8 @@ err:
 	state->tty_rbuf = NULL;
 	return ret;
 }
+#endif
+
 #endif
 
 static int fiq_debugger_dev_suspend(struct device *dev)
@@ -1166,11 +1212,13 @@ static int fiq_debugger_probe(struct platform_device *pdev)
 	spin_lock_init(&state->console_lock);
 	state->console = fiq_debugger_console;
 	state->console.index = pdev->id;
+#if 0
 	if (!console_set_on_cmdline)
 		add_preferred_console(state->console.name,
 			state->console.index, NULL);
 	register_console(&state->console);
 	fiq_debugger_tty_init_one(state);
+#endif
 #endif
 	return 0;
 
@@ -1203,7 +1251,7 @@ static struct platform_driver fiq_debugger_driver = {
 
 static int __init fiq_debugger_init(void)
 {
-#if defined(CONFIG_FIQ_DEBUGGER_CONSOLE)
+#if 0
 	fiq_debugger_tty_init();
 #endif
 	return platform_driver_register(&fiq_debugger_driver);

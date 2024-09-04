@@ -59,6 +59,7 @@ static unsigned long get_target_state(struct thermal_instance *instance,
 		if (throttle) {
 			cur_state = cur_state < instance->upper ?
 				    (cur_state + 1) : instance->upper;
+
 			if (cur_state < instance->lower)
 				cur_state = instance->lower;
 		}

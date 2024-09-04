@@ -49,9 +49,6 @@ int adf_interface_blank(struct adf_interface *intf, u8 state)
 	if (!intf->ops || !intf->ops->blank)
 		return -EOPNOTSUPP;
 
-	if (state > DRM_MODE_DPMS_OFF)
-		return -EINVAL;
-
 	mutex_lock(&dev->client_lock);
 	if (state != DRM_MODE_DPMS_ON)
 		flush_kthread_worker(&dev->post_worker);
@@ -305,8 +302,10 @@ static int adf_buffer_map(struct adf_device *dev, struct adf_buffer *buf,
 	}
 
 done:
-	if (ret < 0)
+	if (ret < 0) {
 		adf_buffer_mapping_cleanup(mapping, buf);
+		memset(mapping, 0, sizeof(*mapping));
+	}
 
 	return ret;
 }

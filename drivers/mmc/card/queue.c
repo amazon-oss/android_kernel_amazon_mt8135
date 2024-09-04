@@ -19,7 +19,7 @@
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 #include "queue.h"
-
+#include <linux/mmc/mmc.h>
 #define MMC_QUEUE_BOUNCESZ	65536
 
 /*
@@ -37,7 +37,7 @@ static int mmc_prep_request(struct request_queue *q, struct request *req)
 		return BLKPREP_KILL;
 	}
 
-	if (mq && mmc_card_removed(mq->card))
+	if (mq && (mmc_card_removed(mq->card) || mmc_access_rpmb(mq)))
 		return BLKPREP_KILL;
 
 	req->cmd_flags |= REQ_DONTPREP;
@@ -169,7 +169,11 @@ static void mmc_queue_setup_discard(struct request_queue *q,
 	q->limits.max_discard_sectors = max_discard;
 	if (card->erased_byte == 0 && !mmc_can_discard(card))
 		q->limits.discard_zeroes_data = 1;
-	q->limits.discard_granularity = card->pref_erase << 9;
+	if (card->pref_erase > 1024)
+		q->limits.discard_granularity = 1024 << 9;	/* Limit it to 512KB */
+	else
+		q->limits.discard_granularity = card->pref_erase << 9;
+
 	/* granularity must not be greater than max. discard */
 	if (card->pref_erase > max_discard)
 		q->limits.discard_granularity = 0;
@@ -190,7 +194,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 		   spinlock_t *lock, const char *subname)
 {
 	struct mmc_host *host = card->host;
-	u64 limit = BLK_BOUNCE_HIGH;
+	u64 limit = BLK_BOUNCE_ANY;
 	int ret;
 	struct mmc_queue_req *mqrq_cur = &mq->mqrq[0];
 	struct mmc_queue_req *mqrq_prev = &mq->mqrq[1];
@@ -203,6 +207,12 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 	if (!mq->queue)
 		return -ENOMEM;
 
+#ifdef CONFIG_ZRAM    
+    if (mmc_card_mmc(card) &&
+        (totalram_pages << (PAGE_SHIFT - 10)) <= (256 * 1024))
+        mq->queue->backing_dev_info.ra_pages =
+    		(VM_MIN_READAHEAD * 1024) / PAGE_CACHE_SIZE;
+#endif // CONFIG_ZRAM
 	mq->mqrq_cur = mqrq_cur;
 	mq->mqrq_prev = mqrq_prev;
 	mq->queue->queuedata = mq;

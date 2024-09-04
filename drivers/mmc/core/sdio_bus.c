@@ -253,6 +253,7 @@ void sdio_unregister_bus(void)
  */
 int sdio_register_driver(struct sdio_driver *drv)
 {
+	/*  debug message ++ */
 	drv->drv.name = drv->name;
 	drv->drv.bus = &sdio_bus_type;
 	return driver_register(&drv->drv);

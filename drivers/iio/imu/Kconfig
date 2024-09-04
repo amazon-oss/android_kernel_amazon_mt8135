@@ -23,6 +23,7 @@ config ADIS16480
 	  Say yes here to build support for Analog Devices ADIS16375, ADIS16480,
 	  ADIS16485, ADIS16488 inertial sensors.
 
+
 endmenu
 
 config IIO_ADIS_LIB
@@ -37,4 +38,20 @@ config IIO_ADIS_LIB_BUFFER
 	  A set of buffer helper functions for the Analog Devices ADIS* device
 	  family.
 
+
+config INVENSENSE_MPU6515
+	tristate "MPU6515 support"
+	default n
+	help
+	  MPU6515 sensor I2C driver support.
+
+config INVENSENSE_ICM20645
+	tristate "ICM20645 support"
+	default n
+	help
+	  ICM20645 sensor I2C driver support.
+
 source "drivers/iio/imu/inv_mpu6050/Kconfig"
+source "drivers/iio/imu/inv_mpu6515/Kconfig"
+source "drivers/iio/imu/inv_icm20645/Kconfig"
+source "drivers/iio/imu/inv_test/Kconfig"

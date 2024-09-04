@@ -15,9 +15,9 @@
  */
 
 #include <linux/err.h>
+#include <linux/ion.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
-#include "../ion.h"
 #include "../ion_priv.h"
 
 static struct ion_device *idev;
@@ -53,7 +53,7 @@ static int tegra_ion_probe(struct platform_device *pdev)
 	}
 	platform_set_drvdata(pdev, idev);
 	return 0;
-err:
+ err:
 	for (i = 0; i < num_heaps; i++) {
 		if (heaps[i])
 			ion_heap_destroy(heaps[i]);
@@ -77,7 +77,7 @@ static int tegra_ion_remove(struct platform_device *pdev)
 static struct platform_driver ion_driver = {
 	.probe = tegra_ion_probe,
 	.remove = tegra_ion_remove,
-	.driver = { .name = "ion-tegra" }
+	.driver = {.name = "ion-tegra"}
 };
 
 module_platform_driver(ion_driver);
