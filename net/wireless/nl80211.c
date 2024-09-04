@@ -5228,9 +5228,11 @@ static int nl80211_trigger_scan(struct sk_buff *skb, struct genl_info *info)
 				err = -EINVAL;
 				goto out_free;
 			}
-			request->ssids[i].ssid_len = nla_len(attr);
-			memcpy(request->ssids[i].ssid, nla_data(attr), nla_len(attr));
-			i++;
+			if (request->ssids) {
+				request->ssids[i].ssid_len = nla_len(attr);
+				memcpy(request->ssids[i].ssid, nla_data(attr), nla_len(attr));
+				i++;
+			}
 		}
 	}
 
@@ -5466,10 +5468,12 @@ static int nl80211_start_sched_scan(struct sk_buff *skb,
 				err = -EINVAL;
 				goto out_free;
 			}
-			request->ssids[i].ssid_len = nla_len(attr);
-			memcpy(request->ssids[i].ssid, nla_data(attr),
-			       nla_len(attr));
-			i++;
+			if (request->ssids) {
+				request->ssids[i].ssid_len = nla_len(attr);
+				memcpy(request->ssids[i].ssid, nla_data(attr),
+					   nla_len(attr));
+				i++;
+			}
 		}
 	}
 

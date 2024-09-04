@@ -580,6 +580,26 @@ int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 		else
 			answ = tp->write_seq - tp->snd_nxt;
 		break;
+		/* MTK_NET_CHANGES */
+        case SIOCKILLSOCK:
+         {
+             struct uid_err uid_e;
+             if (copy_from_user(&uid_e, (char __user *)arg, sizeof(uid_e)))
+                 return -EFAULT;
+             printk(KERN_WARNING "SIOCKILLSOCK uid = %d , err = %d",
+			 	         uid_e.appuid, uid_e.errNum);
+             if (uid_e.errNum == 0)
+             {
+                 // handle BR release problem
+                 tcp_v4_handle_retrans_time_by_uid(uid_e);
+             }
+             else
+             {
+             tcp_v4_reset_connections_by_uid(uid_e);
+             }			 	         
+
+	         return 0;
+         }
 	default:
 		return -ENOIOCTLCMD;
 	}
@@ -727,6 +747,12 @@ ssize_t tcp_splice_read(struct socket *sock, loff_t *ppos,
 				ret = -EAGAIN;
 				break;
 			}
+			/* if __tcp_splice_read() got nothing while we have
+			 * an skb in receive queue, we do not want to loop.
+			 * This might happen with URG data.
+			 */
+			if (!skb_queue_empty(&sk->sk_receive_queue))
+				break;
 			sk_wait_data(sk, &timeo);
 			if (signal_pending(current)) {
 				ret = sock_intr_errno(timeo);
