@@ -676,6 +676,7 @@ static int __fat_write_inode(struct inode *inode, int wait)
 	struct buffer_head *bh;
 	struct msdos_dir_entry *raw_entry;
 	loff_t i_pos;
+	static unsigned int ipos_err_count;
 	sector_t blocknr;
 	int err, offset;
 
@@ -690,8 +691,8 @@ retry:
 	fat_get_blknr_offset(sbi, i_pos, &blocknr, &offset);
 	bh = sb_bread(sb, blocknr);
 	if (!bh) {
-		fat_msg(sb, KERN_ERR, "unable to read inode block "
-		       "for updating (i_pos %lld)", i_pos);
+		fat_msg(sb, (ipos_err_count++ % 100) ? KERN_DEBUG : KERN_ERR,
+			"unable to read inode block for updating (i_pos %lld)", i_pos);
 		return -EIO;
 	}
 	spin_lock(&sbi->inode_hash_lock);
