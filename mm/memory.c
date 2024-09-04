@@ -69,6 +69,45 @@
 
 #include "internal.h"
 
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+static int pageinfo_mmap_alloc[1];
+static int pageinfo_mmap_alloc_cow[1];
+static int pageinfo_sys_alloc[1];
+static int pageinfo_sys_alloc_cow[1];
+static int pageinfo_create_mspace[1];
+static int pageinfo_create_mspace_cow[1];
+static int pageinfo_dalvik_heap_cow[1];
+static int pageinfo_dalvik_linear_cow[1];
+static int pageinfo_dalvik_hashmem_cow[1];
+static int pageinfo_native_hashmem_cow[1];
+static int pageinfo_dalvik_aux_structure_cow[1];
+static int pageinfo_dalvik_gc_noise_cow[1];
+static int pageinfo_dalvik_card_table_cow[1];
+static int pageinfo_dalvik_mark_stack_cow[1];
+static int pageinfo_dalvik_jit_cow[1];
+static int pageinfo_dalvik_heap[1];
+static int pageinfo_dalvik_linear[1];
+static int pageinfo_dalvik_hashmem[1];
+static int pageinfo_native_hashmem[1];
+static int pageinfo_dalvik_aux_structure[1];
+static int pageinfo_dalvik_gc_noise[1];
+static int pageinfo_dalvik_card_table[1];
+static int pageinfo_dalvik_mark_stack[1];
+static int pageinfo_dalvik_jit[1];
+static int pageinfo_ashmem_unpinnable[1];
+static int pageinfo_ashmem_unpinnable_cow[1];
+static int pageinfo_sbrk[1];
+static int pageinfo_sbrk_cow[1];
+static int pageinfo_stack[1];
+static int pageinfo_stack_cow[1];
+static int pageinfo_exec[1];
+static int pageinfo_exec_cow[1];
+static int pageinfo_noreserve[1];
+static int pageinfo_noreserve_cow[1];
+#endif
+/* ACOS_MOD_END {internal_membo} */
+
 #ifdef LAST_NID_NOT_IN_PAGE_FLAGS
 #warning Unfortunate NUMA and NUMA Balancing config, growing page-frame for last_nid.
 #endif
@@ -834,20 +873,20 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		if (!pte_file(pte)) {
 			swp_entry_t entry = pte_to_swp_entry(pte);
 
-			if (swap_duplicate(entry) < 0)
-				return entry.val;
+			if (likely(!non_swap_entry(entry))) {
+				if (swap_duplicate(entry) < 0)
+					return entry.val;
 
-			/* make sure dst_mm is on swapoff's mmlist. */
-			if (unlikely(list_empty(&dst_mm->mmlist))) {
-				spin_lock(&mmlist_lock);
-				if (list_empty(&dst_mm->mmlist))
-					list_add(&dst_mm->mmlist,
-						 &src_mm->mmlist);
-				spin_unlock(&mmlist_lock);
-			}
-			if (likely(!non_swap_entry(entry)))
+				/* make sure dst_mm is on swapoff's mmlist. */
+				if (unlikely(list_empty(&dst_mm->mmlist))) {
+					spin_lock(&mmlist_lock);
+					if (list_empty(&dst_mm->mmlist))
+						list_add(&dst_mm->mmlist,
+							 &src_mm->mmlist);
+					spin_unlock(&mmlist_lock);
+				}
 				rss[MM_SWAPENTS]++;
-			else if (is_migration_entry(entry)) {
+			} else if (is_migration_entry(entry)) {
 				page = migration_entry_to_page(entry);
 
 				if (PageAnon(page))
@@ -965,7 +1004,8 @@ again:
 	return 0;
 }
 
-static inline int copy_pmd_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
+static inline int copy_pmd_range(struct mm_struct *dst_mm,
+				 struct mm_struct *src_mm,
 		pud_t *dst_pud, pud_t *src_pud, struct vm_area_struct *vma,
 		unsigned long addr, unsigned long end)
 {
@@ -1462,6 +1502,16 @@ int zap_vma_ptes(struct vm_area_struct *vma, unsigned long address,
 }
 EXPORT_SYMBOL_GPL(zap_vma_ptes);
 
+/*
+ * FOLL_FORCE can write to even unwritable pte's, but only
+ * after we've gone through a COW cycle and they are dirty.
+ */
+static inline bool can_follow_write_pte(pte_t pte, unsigned int flags)
+{
+	return pte_write(pte) ||
+		((flags & FOLL_FORCE) && (flags & FOLL_COW) && pte_dirty(pte));
+}
+
 /**
  * follow_page_mask - look up a page descriptor from a user-virtual address
  * @vma: vm_area_struct mapping @address
@@ -1569,7 +1619,7 @@ split_fallthrough:
 	}
 	if ((flags & FOLL_NUMA) && pte_numa(pte))
 		goto no_page;
-	if ((flags & FOLL_WRITE) && !pte_write(pte))
+	if ((flags & FOLL_WRITE) && !can_follow_write_pte(pte, flags))
 		goto unlock;
 
 	page = vm_normal_page(vma, address, pte);
@@ -1876,8 +1926,7 @@ long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				 */
 				if ((ret & VM_FAULT_WRITE) &&
 				    !(vma->vm_flags & VM_WRITE))
-					foll_flags &= ~FOLL_WRITE;
-
+					foll_flags |= FOLL_COW;
 				cond_resched();
 			}
 			if (IS_ERR(page))
@@ -2597,6 +2646,18 @@ static inline void cow_user_page(struct page *dst, struct page *src, unsigned lo
 		copy_user_highpage(dst, src, va, vma);
 }
 
+
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+static noinline struct page *do_wp_page_zeroed(struct vm_area_struct *vma,
+                                               unsigned long address)
+{
+	return alloc_zeroed_user_highpage_movable(vma, address);
+}
+#endif
+/* ACOS_MOD_END {internal_membo} */
+
+
 /*
  * This routine handles present pages, when users try to write
  * to a shared page. It is done by copying the page to a new address
@@ -2615,10 +2676,19 @@ static inline void cow_user_page(struct page *dst, struct page *src, unsigned lo
  * but allow concurrent faults), with pte both mapped and locked.
  * We return with mmap_sem still held, but pte unmapped and unlocked.
  */
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+static int noinline do_wp_page(struct mm_struct *mm, struct vm_area_struct *vma,
+		unsigned long address, pte_t *page_table, pmd_t *pmd,
+		spinlock_t *ptl, pte_t orig_pte)
+	__releases(ptl)
+#else
 static int do_wp_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		unsigned long address, pte_t *page_table, pmd_t *pmd,
 		spinlock_t *ptl, pte_t orig_pte)
 	__releases(ptl)
+#endif
+/* ACOS_MOD_END {internal_membo} */
 {
 	struct page *old_page, *new_page = NULL;
 	pte_t entry;
@@ -2790,7 +2860,13 @@ gotten:
 		goto oom;
 
 	if (is_zero_pfn(pte_pfn(orig_pte))) {
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+		new_page = do_wp_page_zeroed(vma, address);
+#else
 		new_page = alloc_zeroed_user_highpage_movable(vma, address);
+#endif
+/* ACOS_MOD_END {internal_membo} */
 		if (!new_page)
 			goto oom;
 	} else {
@@ -2799,6 +2875,128 @@ gotten:
 			goto oom;
 		cow_user_page(new_page, old_page, address, vma);
 	}
+
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+	if (vma->vm_ops) {
+		struct allocation_detail detail = new_page->detail;
+		detail.call_site = (void *)vma->vm_ops;
+		new_page->detail = detail;
+	} else if (vma->vm_start <= mm->brk &&
+		   vma->vm_end >= mm->start_brk) {
+		struct allocation_detail detail = new_page->detail;
+		detail.call_site = (void *)heap_init;
+		new_page->detail = detail;
+	} else if (vma->vm_start <= mm->start_stack &&
+		   vma->vm_end >= mm->start_stack) {
+		struct allocation_detail detail = new_page->detail;
+		detail.call_site = (void *)pageinfo_stack_cow;
+		new_page->detail = detail;
+	} else if (vma->vm_file && vma->vm_file->f_op) {
+		char *pathbuf;
+		char *path;
+		struct allocation_detail detail = new_page->detail;
+		detail.call_site = (void *)vma->vm_file->f_op;
+		pathbuf = kmalloc(PATH_MAX + 11, GFP_TEMPORARY);
+		if (pathbuf) {
+			path = d_path(&vma->vm_file->f_path, pathbuf,
+				      PATH_MAX + 11);
+			if (!IS_ERR(path)) {
+				if (strnstr(path, "mmap_alloc", PATH_MAX+11))
+					detail.call_site =
+						(void *)
+						pageinfo_mmap_alloc_cow;
+				else if (strnstr(path,
+						 "sys_alloc", PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_sys_alloc_cow;
+				else if (strnstr(path, "create_mspace",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_create_mspace_cow;
+				else if (strnstr(path, "dalvik-heap",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_heap_cow;
+				else if (strnstr(path, "dalvik-LinearAlloc",
+						 PATH_MAX+11))
+					detail.call_site = (void *)
+						pageinfo_dalvik_linear_cow;
+				else if (strnstr(path, "://", PATH_MAX+11))
+					detail.call_site = (void *)
+						pageinfo_ashmem_unpinnable_cow;
+				else if (strnstr(path, "dalvik-hashmem",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_hashmem_cow;
+				else if (strnstr(path, "native-hashmem",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_native_hashmem_cow;
+				else if (strnstr(path, "dalvik-aux-structure",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+					pageinfo_dalvik_aux_structure_cow;
+				else if (strnstr(path, "dalvik-bitmap",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_gc_noise_cow;
+				else if (strnstr(path, "dalvik-card-table",
+						 PATH_MAX+11))
+					detail.call_site
+						=
+						(void *)
+						pageinfo_dalvik_card_table_cow;
+				else if (strnstr(path, "dalvik-mark-stack",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_mark_stack_cow;
+				else if (strnstr(path, "dalvik-jit-code-cache",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_jit_cow;
+			}
+			kfree(pathbuf);
+		}
+		new_page->detail = detail;
+	} else if (vma->vm_start <= mm->brk &&
+		   vma->vm_end >= mm->start_brk) {
+		struct allocation_detail detail = new_page->detail;
+		detail.call_site = (void *)pageinfo_sbrk_cow;
+		new_page->detail = detail;
+	} else if (vma->vm_start <= mm->start_stack &&
+		   vma->vm_end >= mm->start_stack) {
+		struct allocation_detail detail = new_page->detail;
+		detail.call_site = (void *)pageinfo_stack_cow;
+		new_page->detail = detail;
+	} else if (vma->vm_private_data) {
+		struct allocation_detail detail = new_page->detail;
+		detail.call_site
+			= (void *)
+			(((char *)vma->vm_private_data)+
+			 ((vma->vm_flags & VM_EXEC) ? 8 : 0));
+		new_page->detail = detail;
+	} else if (vma->vm_flags & VM_EXEC) {
+		struct allocation_detail detail = new_page->detail;
+		detail.call_site = (void *)pageinfo_exec_cow;
+		new_page->detail = detail;
+	} else if (vma->vm_flags & VM_NORESERVE) {
+		struct allocation_detail detail = new_page->detail;
+		detail.call_site = (void *)pageinfo_noreserve_cow;
+		new_page->detail = detail;
+	}
+#endif
+/* ACOS_MOD_END {internal_membo} */
+
 	__SetPageUptodate(new_page);
 
 	if (mem_cgroup_newpage_charge(new_page, mm, GFP_KERNEL))
@@ -2947,12 +3145,15 @@ static inline void unmap_mapping_range_list(struct list_head *head,
 	 */
 	list_for_each_entry(vma, head, shared.nonlinear) {
 		details->nonlinear_vma = vma;
-		unmap_mapping_range_vma(vma, vma->vm_start, vma->vm_end, details);
+		unmap_mapping_range_vma(vma, vma->vm_start,
+					vma->vm_end, details);
 	}
 }
 
 /**
- * unmap_mapping_range - unmap the portion of all mmaps in the specified address_space corresponding to the specified page range in the underlying file.
+ * unmap_mapping_range - unmap the portion of all mmaps in the specified
+ * address_space corresponding to the specified page range in the
+ * underlying file.
  * @mapping: the address space containing mmaps to be unmapped.
  * @holebegin: byte in first page to unmap, relative to the start of
  * the underlying file.  This will be rounded down to a PAGE_SIZE
@@ -3002,9 +3203,22 @@ EXPORT_SYMBOL(unmap_mapping_range);
  * but allow concurrent faults), and pte mapped but not yet locked.
  * We return with mmap_sem still held, but pte unmapped and unlocked.
  */
-static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
-		unsigned long address, pte_t *page_table, pmd_t *pmd,
-		unsigned int flags, pte_t orig_pte)
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+static int noinline do_swap_page(struct mm_struct *mm,
+				 struct vm_area_struct *vma,
+				 unsigned long address,
+				 pte_t *page_table,
+				 pmd_t *pmd, unsigned int flags,
+				 pte_t orig_pte)
+#else
+static int do_swap_page(struct mm_struct *mm,
+			struct vm_area_struct *vma,
+			unsigned long address,
+			pte_t *page_table, pmd_t *pmd,
+			unsigned int flags, pte_t orig_pte)
+#endif
+/* ACOS_MOD_END {internal_membo} */
 {
 	spinlock_t *ptl;
 	struct page *page, *swapcache;
@@ -3200,7 +3414,7 @@ static inline int check_stack_guard_page(struct vm_area_struct *vma, unsigned lo
 		if (prev && prev->vm_end == address)
 			return prev->vm_flags & VM_GROWSDOWN ? 0 : -ENOMEM;
 
-		expand_downwards(vma, address - PAGE_SIZE);
+		return expand_downwards(vma, address - PAGE_SIZE);
 	}
 	if ((vma->vm_flags & VM_GROWSUP) && address + PAGE_SIZE == vma->vm_end) {
 		struct vm_area_struct *next = vma->vm_next;
@@ -3209,7 +3423,7 @@ static inline int check_stack_guard_page(struct vm_area_struct *vma, unsigned lo
 		if (next && next->vm_start == address + PAGE_SIZE)
 			return next->vm_flags & VM_GROWSUP ? 0 : -ENOMEM;
 
-		expand_upwards(vma, address + PAGE_SIZE);
+		return expand_upwards(vma, address + PAGE_SIZE);
 	}
 	return 0;
 }
@@ -3219,15 +3433,31 @@ static inline int check_stack_guard_page(struct vm_area_struct *vma, unsigned lo
  * but allow concurrent faults), and pte mapped but not yet locked.
  * We return with mmap_sem still held, but pte unmapped and unlocked.
  */
-static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
-		unsigned long address, pte_t *page_table, pmd_t *pmd,
-		unsigned int flags)
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+static int noinline do_anonymous_page(struct mm_struct *mm,
+				      struct vm_area_struct *vma,
+				      unsigned long address,
+				      pte_t *page_table, pmd_t *pmd,
+				      unsigned int flags)
+#else
+static int do_anonymous_page(struct mm_struct *mm,
+			     struct vm_area_struct *vma,
+			     unsigned long address,
+			     pte_t *page_table, pmd_t *pmd,
+			     unsigned int flags)
+#endif
+/* ACOS_MOD_END {internal_membo} */
 {
 	struct page *page;
 	spinlock_t *ptl;
 	pte_t entry;
 
 	pte_unmap(page_table);
+
+	/* File mapping without ->vm_ops ? */
+	if (vma->vm_flags & VM_SHARED)
+		return VM_FAULT_SIGBUS;
 
 	/* Check if we need to add a guard page to the stack */
 	if (check_stack_guard_page(vma, address) < 0)
@@ -3249,11 +3479,132 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	page = alloc_zeroed_user_highpage_movable(vma, address);
 	if (!page)
 		goto oom;
+
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+	if (vma->vm_ops) {
+		struct allocation_detail detail = page->detail;
+		detail.call_site = (void *)(((char *)vma->vm_ops)+4);
+		page->detail = detail;
+	} else if (vma->vm_start <= mm->brk &&
+		   vma->vm_end >= mm->start_brk) {
+		struct allocation_detail detail = page->detail;
+		detail.call_site = (void *)(((char *)heap_init)+4);
+		page->detail = detail;
+	} else if (vma->vm_start <= mm->start_stack &&
+		   vma->vm_end >= mm->start_stack) {
+		struct allocation_detail detail = page->detail;
+		detail.call_site = (void *)pageinfo_stack;
+		page->detail = detail;
+	} else if (vma->vm_file && vma->vm_file->f_op) {
+		char *pathbuf;
+		char *path;
+		struct allocation_detail detail = page->detail;
+		detail.call_site = (void *)vma->vm_file->f_op;
+		pathbuf = kmalloc(PATH_MAX + 11, GFP_TEMPORARY);
+		if (pathbuf) {
+			path = d_path(&vma->vm_file->f_path,
+				      pathbuf, PATH_MAX + 11);
+			if (!IS_ERR(path)) {
+				if (strnstr(path, "mmap_alloc", PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_mmap_alloc;
+				else if (strnstr(path, "sys_alloc",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)pageinfo_sys_alloc;
+				else if (strnstr(path, "create_mspace",
+						 PATH_MAX+11))
+					detail.call_site =
+						(void *)pageinfo_create_mspace;
+				else if (strnstr(path, "dalvik-heap",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)pageinfo_dalvik_heap;
+				else if (strnstr(path, "dalvik-LinearAlloc",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_linear;
+				else if (strnstr(path, "://", PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_ashmem_unpinnable;
+				else if (strnstr(path, "dalvik-hashmem",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_hashmem;
+				else if (strnstr(path, "native-hashmem",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_native_hashmem;
+				else if (strnstr(path, "dalvik-aux-structure",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_aux_structure;
+				else if (strnstr(path, "dalvik-bitmap",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_gc_noise;
+				else if (strnstr(path, "dalvik-card-table",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_card_table;
+				else if (strnstr(path, "dalvik-mark-stack",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)
+						pageinfo_dalvik_mark_stack;
+				else if (strnstr(path, "dalvik-jit-code-cache",
+						 PATH_MAX+11))
+					detail.call_site
+						= (void *)pageinfo_dalvik_jit;
+			}
+			kfree(pathbuf);
+		}
+		page->detail = detail;
+	} else if (vma->vm_start <= mm->brk &&
+		   vma->vm_end >= mm->start_brk) {
+		struct allocation_detail detail = page->detail;
+		detail.call_site = (void *)pageinfo_sbrk;
+		page->detail = detail;
+	} else if (vma->vm_start <= mm->start_stack &&
+		   vma->vm_end >= mm->start_stack) {
+		struct allocation_detail detail = page->detail;
+		detail.call_site = (void *)pageinfo_stack;
+		page->detail = detail;
+	} else if (vma->vm_private_data) {
+		struct allocation_detail detail = page->detail;
+		detail.call_site
+			= (void *)(((char *)vma->vm_private_data)
+				   + 4
+				   + ((vma->vm_flags & VM_EXEC) ? 8 : 0));
+		page->detail = detail;
+	} else if (vma->vm_flags & VM_EXEC) {
+		struct allocation_detail detail = page->detail;
+		detail.call_site = (void *)pageinfo_exec;
+		page->detail = detail;
+	} else if (vma->vm_flags & VM_NORESERVE) {
+		struct allocation_detail detail = page->detail;
+		detail.call_site = (void *)pageinfo_noreserve;
+		page->detail = detail;
+	}
+#endif
+/* ACOS_MOD_END {internal_membo} */
+
+
 	/*
 	 * The memory barrier inside __SetPageUptodate makes sure that
 	 * preceeding stores to the page contents become visible before
 	 * the set_pte_at() write.
 	 */
+
 	__SetPageUptodate(page);
 
 	if (mem_cgroup_newpage_charge(page, mm, GFP_KERNEL))
@@ -3327,6 +3678,21 @@ static int __do_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		cow_page = alloc_page_vma(GFP_HIGHUSER_MOVABLE, vma, address);
 		if (!cow_page)
 			return VM_FAULT_OOM;
+
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+		{
+			struct allocation_detail detail = cow_page->detail;
+			if (vma->vm_ops->page_mkwrite)
+				detail.call_site
+					= (void *)vma->vm_ops->page_mkwrite;
+			else
+				detail.call_site = (void *)vma->vm_ops->fault;
+			cow_page->detail = detail;
+		}
+#endif
+/* ACOS_MOD_END {internal_membo} */
+
 
 		if (mem_cgroup_newpage_charge(cow_page, mm, GFP_KERNEL)) {
 			page_cache_release(cow_page);
@@ -3486,14 +3852,29 @@ uncharge_out:
 	return ret;
 }
 
-static int do_linear_fault(struct mm_struct *mm, struct vm_area_struct *vma,
-		unsigned long address, pte_t *page_table, pmd_t *pmd,
-		unsigned int flags, pte_t orig_pte)
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+static int noinline do_linear_fault(struct mm_struct *mm,
+				    struct vm_area_struct *vma,
+				    unsigned long address,
+				    pte_t *page_table, pmd_t *pmd,
+				    unsigned int flags, pte_t orig_pte)
+#else
+static int do_linear_fault(struct mm_struct *mm,
+			   struct vm_area_struct *vma,
+			   unsigned long address,
+			   pte_t *page_table, pmd_t *pmd,
+			   unsigned int flags, pte_t orig_pte)
+#endif
+/* ACOS_MOD_END {internal_membo} */
 {
 	pgoff_t pgoff = (((address & PAGE_MASK)
 			- vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
 
 	pte_unmap(page_table);
+	/* The VMA was not fully populated on mmap() or missing VM_DONTEXPAND */
+	if (!vma->vm_ops->fault)
+		return VM_FAULT_SIGBUS;
 	return __do_fault(mm, vma, address, pmd, pgoff, flags, orig_pte);
 }
 
@@ -3506,9 +3887,23 @@ static int do_linear_fault(struct mm_struct *mm, struct vm_area_struct *vma,
  * but allow concurrent faults), and pte mapped but not yet locked.
  * We return with mmap_sem still held, but pte unmapped and unlocked.
  */
-static int do_nonlinear_fault(struct mm_struct *mm, struct vm_area_struct *vma,
-		unsigned long address, pte_t *page_table, pmd_t *pmd,
-		unsigned int flags, pte_t orig_pte)
+/* ACOS_MOD_BEGIN {internal_membo} */
+#ifdef CONFIG_TRAPZ_PVA
+static int noinline do_nonlinear_fault(struct mm_struct *mm,
+				       struct vm_area_struct *vma,
+				       unsigned long address,
+				       pte_t *page_table, pmd_t *pmd,
+				       unsigned int flags,
+				       pte_t orig_pte)
+#else
+static int do_nonlinear_fault(struct mm_struct *mm,
+			      struct vm_area_struct *vma,
+			      unsigned long address, pte_t *page_table,
+			      pmd_t *pmd,
+			      unsigned int flags,
+			      pte_t orig_pte)
+#endif
+/* ACOS_MOD_END {internal_membo} */
 {
 	pgoff_t pgoff;
 
@@ -3705,11 +4100,9 @@ int handle_pte_fault(struct mm_struct *mm,
 	entry = *pte;
 	if (!pte_present(entry)) {
 		if (pte_none(entry)) {
-			if (vma->vm_ops) {
-				if (likely(vma->vm_ops->fault))
-					return do_linear_fault(mm, vma, address,
-						pte, pmd, flags, entry);
-			}
+			if (vma->vm_ops)
+				return do_linear_fault(mm, vma, address,
+					pte, pmd, flags, entry);
 			return do_anonymous_page(mm, vma, address,
 						 pte, pmd, flags);
 		}
@@ -4088,7 +4481,7 @@ int generic_access_phys(struct vm_area_struct *vma, unsigned long addr,
 	if (follow_phys(vma, addr, write, &prot, &phys_addr))
 		return -EINVAL;
 
-	maddr = ioremap_prot(phys_addr, PAGE_SIZE, prot);
+	maddr = ioremap_prot(phys_addr, PAGE_ALIGN(len + offset), prot);
 	if (write)
 		memcpy_toio(maddr + offset, buf, len);
 	else
@@ -4234,7 +4627,7 @@ void print_vma_addr(char *prefix, unsigned long ip)
 	up_read(&mm->mmap_sem);
 }
 
-#ifdef CONFIG_PROVE_LOCKING
+#if defined(CONFIG_PROVE_LOCKING) || defined(CONFIG_DEBUG_ATOMIC_SLEEP)
 void might_fault(void)
 {
 	/*
