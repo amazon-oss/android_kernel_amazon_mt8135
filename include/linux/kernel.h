@@ -193,13 +193,10 @@ extern int _cond_resched(void);
 		(__x < 0) ? -__x : __x;		\
 	})
 
-#ifdef CONFIG_PROVE_LOCKING
+#if defined(CONFIG_PROVE_LOCKING) || defined(CONFIG_DEBUG_ATOMIC_SLEEP)
 void might_fault(void);
 #else
-static inline void might_fault(void)
-{
-	might_sleep();
-}
+static inline void might_fault(void) { }
 #endif
 
 extern struct atomic_notifier_head panic_notifier_list;
@@ -221,6 +218,9 @@ int __must_check _kstrtoul(const char *s, unsigned int base, unsigned long *res)
 int __must_check _kstrtol(const char *s, unsigned int base, long *res);
 
 int __must_check kstrtoull(const char *s, unsigned int base, unsigned long long *res);
+/* if maybe_incpomplete is true, allows string to be terminated by any character
+ * it could not parse */
+int __must_check kstrtoull_chk(const char *s, unsigned int base, unsigned long long *res, bool maybe_incomplete);
 int __must_check kstrtoll(const char *s, unsigned int base, long long *res);
 
 /**

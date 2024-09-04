@@ -1,0 +1,4 @@
+
+header-y += ddp_drv.h
+header-y += ddp_hal.h
+header-y += ddp_aal.h

@@ -147,6 +147,19 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_CHARGE_ENABLED,
 	/* Local extensions of type int64_t */
 	POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT,
+	/* 20100723 Add for EM */
+	POWER_SUPPLY_PROP_TemperatureR,
+	POWER_SUPPLY_PROP_TempBattVoltage,
+	POWER_SUPPLY_PROP_InstatVolt,
+	POWER_SUPPLY_PROP_BatteryAverageCurrent,
+	POWER_SUPPLY_PROP_BatterySenseVoltage,
+	POWER_SUPPLY_PROP_ISenseVoltage,
+	POWER_SUPPLY_PROP_ChargerVoltage,
+	/* ACOS_MOD_BEGIN {metrics_log} */
+	POWER_SUPPLY_PROP_SUSPEND_DRAIN,  /* 0-100 */
+	POWER_SUPPLY_PROP_SUSPEND_DRAIN_HIGH,  /* 0-10000 */
+	POWER_SUPPLY_PROP_SUSPEND_REALTIME,  /* seconds */
+	/* ACOS_MOD_END {metrics_log} */
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_PROP_MODEL_NAME,
 	POWER_SUPPLY_PROP_MANUFACTURER,
