@@ -13,7 +13,6 @@
 #include <linux/tty.h>
 #include <linux/wait.h>
 #include <linux/vt_kern.h>
-#include <linux/console.h>
 
 
 void __attribute__((weak)) bust_spinlocks(int yes)
@@ -24,7 +23,6 @@ void __attribute__((weak)) bust_spinlocks(int yes)
 #ifdef CONFIG_VT
 		unblank_screen();
 #endif
-		console_unblank();
 		if (--oops_in_progress == 0)
 			wake_up_klogd();
 	}
