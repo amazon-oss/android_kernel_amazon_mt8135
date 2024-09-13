@@ -1,5 +1,6 @@
 config EXT3_FS
 	tristate "Ext3 journalling file system support"
+	depends on BROKEN
 	select JBD
 	help
 	  This is the journalling version of the Second extended file system
