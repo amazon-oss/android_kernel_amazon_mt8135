@@ -1315,32 +1315,6 @@ static int i2c_devs_init(void)
 			i2c_register_board_info(3, &(icm20645_sens_dev.bi), 1);
 		}
 
-		if (hw_cfg->has_cy_touch) {
-			cy_touch_dev.init(&cy_touch_dev);
-			i2c_register_board_info(0, &(cy_touch_dev.bi), 1);
-		}
-
-		if (hw_cfg->has_sy_7508_touch) {
-			if (hw_cfg->touch_auto_recover)
-				dsx_board_data.esd_auto_recover = true;
-			sy_7508_touch_dev.init(&sy_7508_touch_dev);
-			i2c_register_board_info(0, &(sy_7508_touch_dev.bi), 1);
-		}
-
-#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT
-		if (hw_cfg->has_atmel_mxt_touch) {
-			if (hw_cfg->touch_auto_recover)
-				atmel_mxt_pdata.esd_auto_recover = true;
-			i2c_register_board_info(0, &(atmel_mxt_dev.bi), 1);
-			atmel_mxt_config_update();
-		}
-#endif
-
-		if (hw_cfg->has_sy_7301_touch) {
-			sy_7301_touch_dev.init(&sy_7301_touch_dev);
-			i2c_register_board_info(0, &(sy_7301_touch_dev.bi), 1);
-		}
-
 		if (hw_cfg->has_mpu6515) {
 
 			if (hw_cfg->sensor_orient[0] || hw_cfg->sensor_orient[1] ||
@@ -1354,6 +1328,32 @@ static int i2c_devs_init(void)
 			mpu6515_dev.init(&mpu6515_dev);
 			i2c_register_board_info(3, &(mpu6515_dev.bi), 1);
 		}
+	}
+
+	if (hw_cfg->has_cy_touch) {
+		cy_touch_dev.init(&cy_touch_dev);
+		i2c_register_board_info(0, &(cy_touch_dev.bi), 1);
+	}
+
+	if (hw_cfg->has_sy_7508_touch) {
+		if (hw_cfg->touch_auto_recover)
+			dsx_board_data.esd_auto_recover = true;
+		sy_7508_touch_dev.init(&sy_7508_touch_dev);
+		i2c_register_board_info(0, &(sy_7508_touch_dev.bi), 1);
+	}
+
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT
+	if (hw_cfg->has_atmel_mxt_touch) {
+		if (hw_cfg->touch_auto_recover)
+			atmel_mxt_pdata.esd_auto_recover = true;
+		i2c_register_board_info(0, &(atmel_mxt_dev.bi), 1);
+		atmel_mxt_config_update();
+	}
+#endif
+
+	if (hw_cfg->has_sy_7301_touch) {
+		sy_7301_touch_dev.init(&sy_7301_touch_dev);
+		i2c_register_board_info(0, &(sy_7301_touch_dev.bi), 1);
 	}
 
 	if (!(hw_cfg->has_no_tmp103)) {
