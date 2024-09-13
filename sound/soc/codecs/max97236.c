@@ -711,7 +711,7 @@ static void max97236_report_jack_state(struct max97236_priv *max97236,
 		log_to_metrics(ANDROID_LOG_INFO, "AudioJackEvent", buf);
 #endif
 		snd_soc_jack_report(max97236->jack, state,
-			SND_JACK_HEADSET | SND_JACK_LINEOUT | SND_JACK_DATA);
+			SND_JACK_HEADSET | SND_JACK_LINEOUT);
 		max97236->jack_state = state;
 	}
 }
