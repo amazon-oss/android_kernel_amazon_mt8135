@@ -202,7 +202,6 @@ typedef struct _PVRSRV_PROCESS_STATS_ {
 
 	/* OS level process ID */
 	IMG_PID                           pid;
-	IMG_CHAR                          pname[MAX_PROC_NAME_LENGTH]; /* ACOS_MOD_ONELINE {fwk_crash_log_collection} */
 	IMG_UINT32                        ui32RefCount;
 	IMG_UINT32                        ui32MemRefCount;
 
@@ -1199,7 +1198,6 @@ PVRSRVStatsRegisterProcess(IMG_HANDLE* phProcessStats)
 {
     PVRSRV_PROCESS_STATS*  psProcessStats;
     IMG_PID                currentPid = OSGetCurrentProcessIDKM();
-    IMG_PCHAR              currentPName = OSGetCurrentProcessNameKM(); /* ACOS_MOD_ONELINE {fwk_crash_log_collection} */
     IMG_BOOL               bMoveProcess = IMG_FALSE;
 
     PVR_ASSERT(phProcessStats != IMG_NULL);
@@ -1257,7 +1255,6 @@ PVRSRVStatsRegisterProcess(IMG_HANDLE* phProcessStats)
 
 	psProcessStats->eStructureType  = PVRSRV_STAT_STRUCTURE_PROCESS;
 	psProcessStats->pid             = currentPid;
-	snprintf(psProcessStats->pname, sizeof(psProcessStats->pname) - 1, currentPName); /* ACOS_MOD_BEGIN {fwk_crash_log_collection} */
 	psProcessStats->ui32RefCount    = 1;
 	psProcessStats->ui32MemRefCount = 1;
 
@@ -2797,35 +2794,3 @@ _PVRSRVGetGlobalMemStat(IMG_PVOID pvStatPtr,
 	
 	return IMG_TRUE;
 }
-
-/* ACOS_MOD_BEGIN {fwk_crash_log_collection} */
-extern void lmk_add_to_buffer(const char *fmt, ...);
-
-void gpu_mem_debug_lmk(void)
-{
-	int totalGpuMem;
-	PVRSRV_PROCESS_STATS *psProcessStats = psLiveList;
-	OSLockAcquire(psLinkedListLock);
-	lmk_add_to_buffer("%-25s  %-10s  %-10s  %-15s  %-10s  %-15s  %-10s\n"\
-		"==============================================================================================================\n",
-		 "Name", "pid", "total_mem", "gpu_mem_lma", "lma_max",
-		 "gpu_mem_uma", "uma_max");
-	totalGpuMem = 0;
-	while (psProcessStats != IMG_NULL) {
-		IMG_INT32 *statValue = psProcessStats->i32StatValue;
-		int processGpuMemTotal = statValue[PVRSRV_PROCESS_STAT_TYPE_ALLOC_LMA_PAGES] + statValue[PVRSRV_PROCESS_STAT_TYPE_ALLOC_UMA_PAGES];
-		totalGpuMem += processGpuMemTotal;
-		lmk_add_to_buffer("  %-25s  %-10u  %-10u  %-15u  %-10u  %-15u  %-10u\n",
-		psProcessStats->pname,
-		psProcessStats->pid,
-		processGpuMemTotal,
-		statValue[PVRSRV_PROCESS_STAT_TYPE_ALLOC_LMA_PAGES],
-		statValue[PVRSRV_PROCESS_STAT_TYPE_MAX_ALLOC_LMA_PAGES],
-		statValue[PVRSRV_PROCESS_STAT_TYPE_ALLOC_UMA_PAGES],
-		statValue[PVRSRV_PROCESS_STAT_TYPE_MAX_ALLOC_UMA_PAGES]);
-		psProcessStats = psProcessStats->psNext;
-	}
-	lmk_add_to_buffer("total gpu memory: %d\n", totalGpuMem);
-	OSLockRelease(psLinkedListLock);
-}
-/* ACOS_MOD_END {fwk_crash_log_collection} */
