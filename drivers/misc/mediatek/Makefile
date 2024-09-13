@@ -12,7 +12,6 @@ obj-y   +=  xlog/
 obj-y   +=  uart/
 obj-y   +=  eint/
 obj-y   +=  boot/
-obj-$(CONFIG_ZRAM) +=  mlog/
 obj-$(CONFIG_MTK_LEGACY_GPIO_DRIVER)	+=	gpio/
 obj-y   +=  aee/
 obj-y   +=  wdk/
