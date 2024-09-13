@@ -210,7 +210,7 @@ FUNC(swsusp_arch_suspend)
 
 FUNC_END(swsusp_arch_suspend)
 
-#define KERNEL_RAM_PADDR	(PHYS_OFFSET + TEXT_OFFSET)
+#define KERNEL_RAM_PADDR	(PLAT_PHYS_OFFSET + TEXT_OFFSET)
 #ifdef CONFIG_ARM_LPAE
 	/* LPAE requires an additional page for the PGD */
 #define PG_DIR_SIZE	0x5000

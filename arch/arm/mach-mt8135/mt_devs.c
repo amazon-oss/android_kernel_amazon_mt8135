@@ -181,7 +181,7 @@ unsigned long kernel_mem_sz = 0x0;	/* kernel_mem_sz is inited in mt_fixup */
 #define TOTAL_RESERVED_MEM_SIZE (RESERVED_MEM_SIZE_FOR_PMEM + \
 				 RESERVED_MEM_SIZE_FOR_FB)
 
-#define MAX_PFN        ((max_pfn << PAGE_SHIFT) + PHYS_OFFSET)
+#define MAX_PFN        ((max_pfn << PAGE_SHIFT) + PLAT_PHYS_OFFSET)
 
 #define PMEM_MM_START  (pmem_start)
 #define PMEM_MM_SIZE   (RESERVED_MEM_SIZE_FOR_PMEM)
@@ -1921,7 +1921,7 @@ unsigned int mtk_get_max_DRAM_size(void)
 
 unsigned int get_phys_offset(void)
 {
-	return PHYS_OFFSET;
+	return PLAT_PHYS_OFFSET;
 }
 EXPORT_SYMBOL(get_phys_offset);
 
