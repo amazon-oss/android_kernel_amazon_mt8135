@@ -24,7 +24,6 @@
  */
 
 #include <sound/core.h>
-#include <linux/switch.h>
 
 struct input_dev;
 
@@ -44,7 +43,6 @@ enum snd_jack_types {
 	SND_JACK_VIDEOOUT	= 0x0010,
 	SND_JACK_AVOUT		= SND_JACK_LINEOUT | SND_JACK_VIDEOOUT,
 	SND_JACK_LINEIN		= 0x0020,
-	SND_JACK_DATA		= 0x0040,
 
 	/* Kept separate from switches to facilitate implementation */
 	SND_JACK_BTN_0		= 0x4000,
@@ -59,8 +57,6 @@ enum snd_jack_types {
 #define SND_JACK_SWITCH_TYPES 6
 
 struct snd_jack {
-	struct switch_dev sdev;
-	int sstatus;
 	struct input_dev *input_dev;
 	int registered;
 	int type;

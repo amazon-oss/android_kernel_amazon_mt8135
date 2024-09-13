@@ -2644,7 +2644,6 @@ static int snd_pcm_playback_ioctl1(struct file *file,
 			return -EFAULT;
 		result = snd_pcm_lib_write(substream, xferi.buf, xferi.frames);
 		__put_user(result, &_xferi->result);
-
 		return result < 0 ? result : 0;
 	}
 	case SNDRV_PCM_IOCTL_WRITEN_FRAMES:
