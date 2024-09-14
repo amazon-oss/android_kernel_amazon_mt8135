@@ -4669,7 +4669,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 				| MMC_CAP_UHS_SDR104;
 		mmc->caps2 |= MMC_CAP2_HS200_1_8V_SDR;
 	}
-	mmc->caps2 |= MMC_CAP2_POWEROFF_NOTIFY;
+	mmc->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
 	if (hw->flags & MSDC_DDR)
 		mmc->caps |= MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR;
 	if (!(hw->flags & MSDC_REMOVABLE))
