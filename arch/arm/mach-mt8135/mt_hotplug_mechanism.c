@@ -16,7 +16,9 @@
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 #include <mach/hotplug.h>
+#ifdef CONFIG_MTK_DYNAMIC_BOOST
 #include <mach/dynamic_boost.h>
+#endif
 
 
 
@@ -107,7 +109,9 @@ static void mt_hotplug_mechanism_sample_ms_adjust(struct work_struct *data)
 static void __ref mt_hotplug_mechanism_early_suspend(struct early_suspend *h)
 {
 	HOTPLUG_INFO("mt_hotplug_mechanism_early_suspend");
+	#ifdef CONFIG_MTK_DYNAMIC_BOOST
 	set_dynamic_boost(-1, PRIO_RESET);
+	#endif
 	if (g_enable) {
 		int i = 0;
 
@@ -139,7 +143,9 @@ static void __ref mt_hotplug_mechanism_late_resume(struct early_suspend *h)
 				cpu_up(i);
 		}
 	}
+	#ifdef CONFIG_MTK_DYNAMIC_BOOST
 	set_dynamic_boost(-1, PRIO_TWO_LITTLES);
+	#endif
 	g_cur_state = STATE_ENTER_LATE_RESUME;
 	schedule_work(&hotplug_sample_ms_adj_work);
 	return;

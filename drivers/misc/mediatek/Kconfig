@@ -129,6 +129,12 @@ config MTK_AUTO_DETECT_MAGNETOMETER
 	help
 	   one load to support different magnetometer sensor
 
+config MTK_DYNAMIC_BOOST
+	bool "MTK_DYNAMIC_BOOST"
+	depends on CPU_FREQ_GOV_INTERACTIVEPLUS
+	help
+	   Say Y to enable dynamic boost.
+
 # Custom
 config CUSTOM_KERNEL_ACCELEROMETER
 	bool "CUSTOM_KERNEL_ACCELEROMETER"

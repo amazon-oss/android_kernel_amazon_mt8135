@@ -1,2 +1,2 @@
 include $(srctree)/drivers/misc/mediatek/Makefile.custom
-obj-y += dynamic_boost.o
+obj-$(CONFIG_MTK_DYNAMIC_BOOST) += dynamic_boost.o
