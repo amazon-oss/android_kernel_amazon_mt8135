@@ -25,14 +25,6 @@
 #include "mach/mt_thermal.h"
 #include "mach/mtk_mdm_monitor.h"
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#include <linux/metricslog.h>
-#ifndef THERMO_METRICS_STR_LEN
-#define THERMO_METRICS_STR_LEN 128
-#endif
-static char *mPrefix = "pa_thermal_zone:def:monitor=1";
-static char mBuf[THERMO_METRICS_STR_LEN];
-#endif
 
 static unsigned int interval = 10000;	/* mseconds, 0 : no auto polling */
 static unsigned int trip_temp[10] = { 120000, 80000, 70000, 60000, 50000, 40000, 30000, 20000, 10000, 5000 };
@@ -289,12 +281,6 @@ static int sysrst_set_cur_state(struct thermal_cooling_device *cdev, unsigned lo
 		pr_emerg("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 		pr_emerg("*****************************************");
 		pr_emerg("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		snprintf(mBuf, THERMO_METRICS_STR_LEN,
-			 "%s;thermal_caught_shutdown=1;CT;1:NR",
-			 mPrefix);
-		log_to_metrics(ANDROID_LOG_INFO, "ThermalEvent", mBuf);
-#endif
 		orderly_poweroff(true);
 	}
 	return 0;

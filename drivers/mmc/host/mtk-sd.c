@@ -1873,12 +1873,6 @@ static void msdc_tasklet_card(unsigned long arg)
 	}
 	dev_dbg(host->dev, "%s: card %s\n", __func__, inserted ? "inserted" : "removed");
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	if ((host->hw->host_function == MSDC_SD) && inserted) {
-		host->inserted_times++;
-		mod_delayed_work(system_wq, &host->metrics_work, METRICS_DELAY);
-	}
-#endif
 
 	host->card_inserted = inserted;
 	host->mmc->f_max = HOST_MAX_MCLK;
@@ -2955,9 +2949,6 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
 							"crc/total %d/%d poto %d datato %d total_pc %d busy %d pcto %d pc25 %d pc_sus %d\n",
 							host->crc_count, host->req_count, host->powertimeout_count, host->datatimeout_count,
 							host->pc_count, host->pc_busy, host->pc_datatimeout, host->pc_crcsdr25, host->pc_suspend);
-#ifdef CONFIG_AMAZON_METRICS_LOG
-					mod_delayed_work(system_wq, &host->metrics_work, METRICS_DELAY);
-#endif
 				}
 				return;
 			}
@@ -3583,23 +3574,6 @@ int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
 	return err;
 }
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-static void msdc_metrics_work(struct work_struct *work)
-{
-	struct msdc_host *host = container_of(work, struct msdc_host, metrics_work.work);
-	MSDC_LOG_COUNTER_TO_VITALS(crc, host->crc_count);
-	MSDC_LOG_COUNTER_TO_VITALS(req, host->req_count);
-	MSDC_LOG_COUNTER_TO_VITALS(datato, host->datatimeout_count);
-	MSDC_LOG_COUNTER_TO_VITALS(poto, host->powertimeout_count);
-	MSDC_LOG_COUNTER_TO_VITALS(pc_count, host->pc_count);
-	MSDC_LOG_COUNTER_TO_VITALS(pc_busy, host->pc_busy);
-	MSDC_LOG_COUNTER_TO_VITALS(pc_datato, host->pc_datatimeout);
-	MSDC_LOG_COUNTER_TO_VITALS(pc_crcsdr25, host->pc_crcsdr25);
-	MSDC_LOG_COUNTER_TO_VITALS(pc_suspend, host->pc_suspend);
-	MSDC_LOG_COUNTER_TO_VITALS(cmd19_fail, host->cmd19_fail);
-	MSDC_LOG_COUNTER_TO_VITALS(inserted, host->inserted_times);
-}
-#endif
 
 static void msdc_repeat_request(struct work_struct *work)
 {
@@ -3664,17 +3638,11 @@ retry:
 					host->pc_datatimeout++;
 				if (ret)
 					host->pc_busy++;
-#ifdef CONFIG_AMAZON_METRICS_LOG
-				mod_delayed_work(system_wq, &host->metrics_work, METRICS_DELAY);
-#endif
 				ret = mmc_sd_power_cycle(host->mmc, host->mmc->ocr, host->mmc->card);
 				atomic_set(&host->reinit_card, 0);
 				if (ret) {
 					dev_err(host->dev, "Failed to do power cycle, retrying %d !\n", retry_count);
 					host->powertimeout_count++;
-#ifdef CONFIG_AMAZON_METRICS_LOG
-					mod_delayed_work(system_wq, &host->metrics_work, METRICS_DELAY);
-#endif
 					if (retry_count++ < 3)
 						goto retry;
 					mmc_card_set_removed(host->mmc->card);
@@ -4072,9 +4040,6 @@ out:
 		if (host->mclk < 25000000) {
 			host->cmd19_fail++;
 			pr_err("CMD 19 tune fail!\n");
-#ifdef CONFIG_AMAZON_METRICS_LOG
-			mod_delayed_work(system_wq, &host->metrics_work, METRICS_DELAY);
-#endif
 			return -EIO;
 		}
 		msdc_set_mclk(host, ddr, host->mclk / 2); /* lower to 50Mhz */
@@ -4764,9 +4729,6 @@ static int msdc_drv_probe(struct platform_device *pdev)
 		goto release;
 	}
 	INIT_WORK(&host->repeat_req, msdc_repeat_request);
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	INIT_DELAYED_WORK(&host->metrics_work, msdc_metrics_work);
-#endif
 	spin_lock_init(&host->lock);
 	spin_lock_init(&host->clk_gate_lock);
 	spin_lock_init(&host->remove_bad_card);

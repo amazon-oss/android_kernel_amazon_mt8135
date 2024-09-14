@@ -6,9 +6,6 @@
 #include <misc/dongle_hdmi.h>
 #include <misc/charger_notifier.h>
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#include <linux/metricslog.h>
-#endif
 
 #ifdef CEC_ENABLE
 #include "slimport_tx_cec.h"
@@ -1144,9 +1141,6 @@ static void sp_tx_aux_rd(unchar len_cmd)
 unchar sp_tx_get_edid_block(void)
 {
 	unchar c;
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	char buf[128];
-#endif
 	int ret = 0;
 	/*  xjh del 20130929
 	sp_tx_aux_wr(0x00);
@@ -1156,11 +1150,6 @@ unchar sp_tx_get_edid_block(void)
 	sp_tx_aux_wr(0x7e);
 	sp_tx_aux_rd(0x01);
 	ret = sp_read_reg(TX_P0, BUF_DATA_0, &c);
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	snprintf(buf, sizeof(buf),
-		"slimport:def:edit_block=%d;CT;1:NR",(int)(c + 1));
-	log_to_metrics(ANDROID_LOG_INFO, "kernel", buf);
-#endif
 	debug_printf("EDID Block = %d\n", (int)(c + 1));
 	if (unlikely(ret != 2))
 		return 0xff;
@@ -1371,33 +1360,14 @@ unchar retry_read_edid_block(int times)
 {
 	int retry_time = 0;
 	unchar block_sum = 0xff;
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	char buf[128];
-#endif
 	for (retry_time = 0; retry_time < times; retry_time++) {
 		block_sum = sp_tx_get_edid_block();
 		msleep(20);
 		if ((block_sum <= 3) && (block_sum != 0))
 		{
-		#ifdef CONFIG_AMAZON_METRICS_LOG
-			snprintf(buf, sizeof(buf),
-				"slimport:def:read_edit_times=%d;CT;1:NR",times);
-			log_to_metrics(ANDROID_LOG_INFO, "kernel", buf);
-			snprintf(buf, sizeof(buf),
-				"slimport:def:block_sum=%d;CT;1:NR",(int)block_sum);
-			log_to_metrics(ANDROID_LOG_INFO, "kernel", buf);
-		#endif
 			return block_sum;
 		}
 	}
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	snprintf(buf, sizeof(buf),
-		"slimport:def:read_edit_times=%d;CT;1:NR",times);
-	log_to_metrics(ANDROID_LOG_INFO, "kernel", buf);
-	snprintf(buf, sizeof(buf),
-		"slimport:def:block_sum=%d;CT;1:NR",(int)block_sum);
-	log_to_metrics(ANDROID_LOG_INFO, "kernel", buf);
-#endif
 	return block_sum;
 }
 bool sp_tx_edid_read(unchar *pedid_blocks_buf)
@@ -1687,10 +1657,6 @@ void slimport_edid_process(void)
 			notify_power_status_change(DONGLE_HDMI_POWER_ON);
 			notify_power_off = false;
 		}
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		log_to_metrics(ANDROID_LOG_INFO, "kernel",
-			"slimport:def:Notify_DONGLE_HDMI_POWER_ON=1;CT;1:NR");
-#endif
 		debug_puts("hdmi_rx_set_hpd 1 !\n");
 		hdmi_rx_set_termination(1, &ret);
 		if (unlikely(ret < 0)) {
@@ -2530,17 +2496,9 @@ void slimport_config_video_output(void)
 			sp_read_reg(RX_P0, HDMI_STATUS, &temp_value);
 			if (temp_value & HDMI_MODE) {
 				sp_tx_send_message(MSG_INPUT_HDMI);
-				#ifdef CONFIG_AMAZON_METRICS_LOG
-				log_to_metrics(ANDROID_LOG_INFO, "kernel",
-					"slimport:def:HDMI_Mode=1;CT;1:NR");
-				#endif
 				debug_puts("HDMI mode: Video is stable.\n");
 				//hdmi_rx_set_sys_state(HDMI_AUDIO_CONFIG);
 			} else {
-				#ifdef CONFIG_AMAZON_METRICS_LOG
-				log_to_metrics(ANDROID_LOG_INFO, "kernel",
-					"slimport:def:DVI_Mode=1;CT;1:NR");
-				#endif
 				debug_puts("DVI mode: Video is stable.\n");
 				sp_tx_send_message(MSG_INPUT_DVI);
 				hdmi_rx_mute_audio(0);
@@ -2718,10 +2676,6 @@ void slimport_hdcp_process(void)
 			system_power_ctrl_0();
 			HDCP_state = HDCP_CAPABLE_CHECK;
 			HDCP_fail_count = 0;
-			#ifdef CONFIG_AMAZON_METRICS_LOG
-			log_to_metrics(ANDROID_LOG_INFO, "kernel",
-				"slimport:def:hdcp_auth_failed=1;CT;1:NR");
-			#endif
 			debug_puts("*********hdcp_auth_failed*********\n");
 		}else {
 			HDCP_fail_count++;
@@ -3252,10 +3206,6 @@ static void sp_tx_hdcp_link_chk_fail_handler(void)
 	} else {
 		if (sp_repeater_mode == false){
 			system_state_change_with_case(STATE_HDCP_AUTH);
-			#ifdef CONFIG_AMAZON_METRICS_LOG
-			log_to_metrics(ANDROID_LOG_INFO, "kernel",
-				"slimport:def:HDCP_Sync_lost=1;CT;1:NR");
-			#endif
 			debug_puts("hdcp_link_chk_fail:HDCP Sync lost!\n");
 		}
 	}
@@ -3763,10 +3713,6 @@ static void sp_tx_auth_done_int_handler(void)
 			} else {
 				int ret = 0;
 				debug_puts("Authentication failed in AUTH_done\n");
-				#ifdef CONFIG_AMAZON_METRICS_LOG
-				log_to_metrics(ANDROID_LOG_INFO, "kernel",
-					"slimport:def:Authentication_failed_in_AUTH_done=1;CT;1:NR");
-				#endif
 				sp_tx_video_mute(1);
 				sp_tx_clean_hdcp_status(&ret);
 				HDCP_state = HDCP_FAILE;

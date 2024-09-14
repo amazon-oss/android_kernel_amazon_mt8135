@@ -27,9 +27,6 @@
 #include <sound/jack.h>
 #include <sound/max97236.h>
 #include "max97236.h"
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#include <linux/metricslog.h>
-#endif
 #include <linux/version.h>
 
 #define DEBUG
@@ -633,17 +630,6 @@ static void max97236_keypress(struct max97236_priv *max97236,
 					press ? (char *) keystr : "BUTTON",
 					press ? "PRESS" : "RELEASE");
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	snprintf(buf, sizeof(buf),
-			"%s:jack:key=%s;CT;1,press=%d,status_0=0x%x,status_1=0x%x,MBH=0x%x;CT;1:NR",
-				__func__,
-				press ? (char *) keystr : "BUTTON",
-				press,
-				status_reg[0],
-				status_reg[1],
-				reg);
-	log_to_metrics(ANDROID_LOG_INFO, "AudioJackEvent", buf);
-#endif
 
 	snd_soc_jack_report(max97236->jack, key,  (SND_JACK_BTN_0 | SND_JACK_BTN_3 | SND_JACK_BTN_5));
 }
@@ -682,34 +668,10 @@ static void max97236_report_jack_state(struct max97236_priv *max97236,
 		string);
 
 	if (max97236->jack_state != state) {
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		char buf[128];
-#endif
 		if (max97236->keyscan != 0) {
 			snd_soc_jack_report(max97236->jack, 0,  (SND_JACK_BTN_0 | SND_JACK_BTN_3 | SND_JACK_BTN_5));
 			max97236->keyscan = 0;
-#ifdef CONFIG_AMAZON_METRICS_LOG
-			snprintf(buf, sizeof(buf),
-				"%s:jack:key=%s;CT;1,press=0;CT;1:NR",
-					__func__,
-					"BUTTON");
-			log_to_metrics(ANDROID_LOG_INFO, "AudioJackEvent", buf);
-#endif
 		}
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		if (state == 0)
-			snprintf(buf, sizeof(buf),
-				"%s:jack:unplugged=1;CT;1:NR", __func__);
-		else
-			snprintf(buf, sizeof(buf),
-				"%s:jack:plugged=1;CT;1,state_%s=1;status_0=0x%x,status_1=0x%x,status_2=0x%x;CT;1:NR",
-							__func__,
-							string,
-							status_reg[0],
-							status_reg[1],
-							status_reg[2]);
-		log_to_metrics(ANDROID_LOG_INFO, "AudioJackEvent", buf);
-#endif
 		snd_soc_jack_report(max97236->jack, state,
 			SND_JACK_HEADSET | SND_JACK_LINEOUT);
 		max97236->jack_state = state;

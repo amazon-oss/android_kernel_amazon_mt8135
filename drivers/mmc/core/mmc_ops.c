@@ -924,45 +924,6 @@ int mmc_gen_cmd(struct mmc_card *card, void *buf,
 	return 0;
 }
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-int mmc_samsung_report(struct mmc_card *card, u8 *buf)
-{
-	int err;
-
-	mmc_claim_host(card->host);
-	err = mmc_samsung_smart_read(card, buf);
-	mmc_release_host(card->host);
-
-	if (err)
-		return err;
-
-	return 0;
-}
-
-int mmc_toshiba_report(struct mmc_card *card, u8 *buf)
-{
-	struct tsb_wear_info *hbblk = (struct tsb_wear_info *)buf;
-	int err;
-
-	mmc_set_blocklen(card, 512);
-
-	err = mmc_gen_cmd(card, buf, 0, 0, 0, 0);
-	if (err) {
-		pr_info("tsb eMMC wear leveling error %d\n", err);
-		return err;
-	}
-
-	mmc_gen_cmd(card, buf, 0, 0, 0, 1);
-
-	pr_info(
-		"eMMC Health CMD:0x%x sts:0x%x, mlc(max:%d avg:%d), "
-		"slc(max:%d avg:%d)\n", hbblk->sub_cmd_no, hbblk->status,
-		__swab32(hbblk->mlc_wr_max), __swab32(hbblk->mlc_wr_avg),
-		__swab32(hbblk->slc_wr_max), __swab32(hbblk->slc_wr_avg));
-
-	return 0;
-}
-#endif /* CONFIG_AMAZON_METRICS_LOG */
 #endif /* CONFIG_MMC_SAMSUNG_SMART */
 int mmc_send_tuning(struct mmc_host *host)
 {

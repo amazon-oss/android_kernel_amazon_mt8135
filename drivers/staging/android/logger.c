@@ -34,12 +34,6 @@
 
 #include <asm/ioctls.h>
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#include <linux/metricslog.h>
-
-static int metrics_init;
-#define VITAL_ENTRY_MAX_PAYLOAD 512
-#endif
 
 static int s_fake_read;
 module_param_named(fake_read, s_fake_read, int, 0660);
@@ -631,22 +625,6 @@ static struct logger_log *get_log_from_minor(int minor)
 }
 
 /*
-#ifdef CONFIG_AMAZON_METRICS_LOG
-static struct logger_log *get_log_from_name(char* name)
-{
-    struct logger_log *log;
-    if (0 == name) {
-        return NULL;
-    }
-    list_for_each_entry(log, &log_list, logs)
-        if (0 == strcmp(log->misc.name, name))
-            return log;
-    return NULL;
-}
-#endif
-*/
-
-/*
  * logger_open - the log's open() file operation
  *
  * Note how near a no-op this is in the write-only case. Keep it that way!
@@ -908,130 +886,6 @@ static void logger_kernel_write(struct logger_log *log, const struct iovec *iov,
 	wake_up_interruptible(&log->wq);
 }
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-void log_to_metrics(enum android_log_priority priority,
-	const char *domain, char *log_msg)
-{
-	static struct logger_log *log;
-	char *p = log_msg;
-
-	if (log == NULL) {
-		struct logger_log *t;
-		list_for_each_entry(t, &log_list, logs)
-			if (strncmp(t->misc.name, LOGGER_LOG_METRICS, strlen(LOGGER_LOG_METRICS)) == 0)
-				log = t;
-	}
-
-	if (metrics_init != 0 && log_msg != NULL) {
-		struct iovec vec[3];
-
-		if (domain == NULL)
-			domain = "kernel";
-
-		while (*p != '\0') {
-			if (' ' == *p)
-				*p = '_';
-			p++;
-		}
-
-		vec[0].iov_base = (unsigned char *)&priority;
-		vec[0].iov_len  = 1;
-
-		vec[1].iov_base = (void *)domain;
-		vec[1].iov_len  = strlen(domain) + 1;
-
-		vec[2].iov_base = (void *)log_msg;
-		vec[2].iov_len  = strlen(log_msg) + 1;
-
-		logger_kernel_write(log, vec, 3);
-	}
-}
-
-void log_to_vitals(enum android_log_priority priority,
-	const char *domain, const char *log_msg)
-{
-	static struct logger_log *log;
-
-	if (log == NULL) {
-		struct logger_log *t;
-		list_for_each_entry(t, &log_list, logs)
-			if (strncmp(t->misc.name, LOGGER_LOG_AMAZON_VITALS, strlen(LOGGER_LOG_AMAZON_VITALS)) == 0)
-				log = t;
-	}
-
-	if (metrics_init != 0 && log_msg != NULL) {
-		struct iovec vec[3];
-
-		if (domain == NULL)
-			domain = "kernel";
-
-		vec[0].iov_base = (unsigned char *)&priority;
-		vec[0].iov_len  = 1;
-
-		vec[1].iov_base = (void *)domain;
-		vec[1].iov_len  = strlen(domain) + 1;
-
-		vec[2].iov_base = (void *)log_msg;
-		vec[2].iov_len  = strlen(log_msg) + 1;
-
-		logger_kernel_write(log, vec, 3);
-	}
-}
-void log_counter_to_vitals(enum android_log_priority priority,
-			const char *domain, const char *program,
-			const char *source, const char *key,
-			long counter_value, const char *unit,
-			const char *metadata, vitals_type type)
-{
-	char str[VITAL_ENTRY_MAX_PAYLOAD];
-	char metadata_msg[VITAL_ENTRY_MAX_PAYLOAD];
-
-	if (metadata != NULL && strlen(metadata))
-		snprintf(metadata_msg, VITAL_ENTRY_MAX_PAYLOAD,
-				 ",metadata=%s;DV;1", metadata);
-	else
-		metadata_msg[0] = '\0';
-	/* format (program):(source):[key=(key);
-	   DV;1,]counter=(counter_value);1,unit=(unit);
-	   DV;1,metadata=(metadata);DV;1:HI */
-	if (key != NULL) {
-		snprintf(str, VITAL_ENTRY_MAX_PAYLOAD,
-			"%s:%s:type=%d;DV;1,key=%s;DV;1,counter=%ld;CT;1,unit=%s;DV;1%s:HI",
-			program, source, type,
-			key, counter_value, unit,
-			metadata_msg);
-	}	else {
-		snprintf(str, VITAL_ENTRY_MAX_PAYLOAD,
-			"%s:%s:type=%d;DV;1,counter=%ld;CT;1,unit=%s;DV;1%s:HI",
-			program, source, type,
-			counter_value, unit,
-			metadata_msg);
-	}
-	log_to_vitals(priority, domain, str);
-}
-
-void log_timer_to_vitals(enum android_log_priority priority,
-			const char *domain, const char *program,
-			const char *source, const char *key,
-			long timer_value, const char *unit, vitals_type type)
-{
-	char str[VITAL_ENTRY_MAX_PAYLOAD];
-	/* format (program):(source):[key=(key);
-	   DV;1,]timer=(timer_value);1,unit=(unit);DV;1:HI */
-	if (key != NULL) {
-		snprintf(str, VITAL_ENTRY_MAX_PAYLOAD,
-			"%s:%s:type=%d;DV;1,key=%s;DV;1,timer=%ld;TI;1,unit=%s;DV;1:HI",
-			program, source, type,
-			key, timer_value, unit);
-	}	else {
-		snprintf(str, VITAL_ENTRY_MAX_PAYLOAD,
-			"%s:%s:type=%d;DV;1,timer=%ld;TI;1,unit=%s;DV;1:HI",
-			program, source, type,
-			timer_value, unit);
-	}
-	log_to_vitals(priority, domain, str);
-}
-#endif
 
 /*
  * Log size must must be a power of two, and greater than
@@ -1223,13 +1077,6 @@ static int __init logger_init(void)
 		goto out;
 #endif
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	ret = create_log(LOGGER_LOG_METRICS, __METRICS_BUF_SIZE);
-	if (unlikely(ret))
-		goto out;
-
-	metrics_init = 1;
-#endif
 
 #ifdef CONFIG_AMAZON_LOG
 #ifndef CONFIG_AMAZON_LOGD

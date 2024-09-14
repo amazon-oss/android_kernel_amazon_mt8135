@@ -42,10 +42,6 @@
 #include <linux/sign_of_life.h>
 #endif
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#include <linux/metricslog.h>
-#define TMP103_METRICS_STR_LEN 128
-#endif
 
 #include <mach/mt_board.h>
 
@@ -76,34 +72,14 @@ static int tmp103_thermal_get_temp(struct thermal_zone_device *thermal,
 	long temp = 0;
 	long tempv = 0;
 	int alpha, offset, weight;
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	char buf[TMP103_METRICS_STR_LEN];
-	static atomic_t query_count;
-	unsigned count;
-	static unsigned int mask = 0x1FFF;
-#endif
 
 	if (!tzone || !pdata)
 		return -EINVAL;
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	count = atomic_read(&query_count);
-	atomic_inc(&query_count);
-#endif
 
 	list_for_each_entry(tdev, &thermal_sensor_list, node) {
 		temp = tdev->dev_ops->get_temp(tdev);
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		/* Log in metrics around every 2 hour normally
-			and 4 mins wheny throttling */
-		if (!(count & mask)) {
-			snprintf(buf, TMP103_METRICS_STR_LEN,
-				"%s:%s_temp=%lu;CT;1:NR",
-				PREFIX, tdev->name, temp);
-			log_to_metrics(ANDROID_LOG_INFO, "ThermalEvent", buf);
-		}
-#endif
 
 		alpha = tdev->tdp->alpha;
 		offset = tdev->tdp->offset;
@@ -119,21 +95,6 @@ static int tmp103_thermal_get_temp(struct thermal_zone_device *thermal,
 		tempv += (weight * tdev->off_temp)/DMF;
 	}
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	/* Log in metrics around every 1 hour normally
-		and 2 mins wheny throttling */
-	if (!(count & mask)) {
-		snprintf(buf, TMP103_METRICS_STR_LEN,
-			"%s:pcb_temp=%lu;CT;1:NR",
-			PREFIX, tempv);
-		log_to_metrics(ANDROID_LOG_INFO, "ThermalEvent", buf);
-	}
-
-	if (tempv > pdata->trips[0].temp)
-		mask = 0xFF;
-	else
-		mask = 0x1FFF;
-#endif
 
 	*t = (unsigned long) tempv;
 

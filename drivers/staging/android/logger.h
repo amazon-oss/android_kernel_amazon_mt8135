@@ -20,9 +20,6 @@
 #include <linux/types.h>
 #include <linux/ioctl.h>
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#include <linux/metricslog.h>
-#endif
 
 /**
  * struct user_logger_entry_compat - defines a single entry that is given to a logger
@@ -102,19 +99,6 @@ struct logger_entry {
 #endif
 #endif
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#ifndef __METRICS_BUF_SIZE
-#ifdef CONFIG_AMAZON_LOGD
-#define __METRICS_BUF_SIZE (16*1024)
-#else
-#define __METRICS_BUF_SIZE (128*1024)
-#endif /* CONFIG_AMAZON_LOGD */
-#endif /* __METRICS_BUF_SIZE */
-
-#ifndef __VITALS_BUF_SIZE
-#define __VITALS_BUF_SIZE (16*1024)
-#endif
-#endif
 
 #else
 
@@ -140,19 +124,6 @@ struct logger_entry {
 #endif
 #endif
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#ifndef __METRICS_BUF_SIZE
-#ifdef CONFIG_AMAZON_LOGD
-#define __METRICS_BUF_SIZE (16*1024)
-#else
-#define __METRICS_BUF_SIZE (128*1024)
-#endif /* CONFIG_AMAZON_LOGD */
-#endif
-
-#ifndef __VITALS_BUF_SIZE
-#define __VITALS_BUF_SIZE (16*1024)
-#endif
-#endif
 
 #endif
 
@@ -167,10 +138,6 @@ struct logger_entry {
 #define LOGGER_LOG_AMAZON_MAIN "log_amazon_main"       /* private buffer for amazon signed apk */
 #endif
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#define LOGGER_LOG_METRICS	"log_metrics"	/* metrics logs */
-#define LOGGER_LOG_AMAZON_VITALS "log_vitals"	/* vitals log */
-#endif
 
 #define LOGGER_ENTRY_MAX_PAYLOAD	4076
 

@@ -17,9 +17,6 @@
 int mmc_register_host_class(void);
 void mmc_unregister_host_class(void);
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-extern void mmc_host_metrics_work(struct work_struct *work);
-#endif /* CONFIG_AMAZON_METRICS_LOG */
 void mmc_latency_hist_sysfs_init(struct mmc_host *host);
 void mmc_latency_hist_sysfs_exit(struct mmc_host *host);
 

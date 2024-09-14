@@ -27,11 +27,6 @@ extern int g_R_I_SENSE;
 extern int g_R_CHARGER_1;
 extern int g_R_CHARGER_2;
 
-#if defined(CONFIG_AMAZON_METRICS_LOG)
-extern kal_int32 gFG_BATT_CAPACITY_aging;
-extern kal_int32 gFG_BATT_CAPACITY;
-#endif
-
 /* ============================================================ */
 /* External function */
 /* ============================================================ */

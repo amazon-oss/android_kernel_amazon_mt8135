@@ -9,9 +9,6 @@
 #include <mach/mt_reg_base.h>
 #include <mach/mt_clkmgr.h>
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#include <linux/metricslog.h>
-#endif
 
 #define MAX_GPD_NUM         (1 + 1)	/* one null gpd */
 #define MAX_BD_NUM          (1024)
@@ -1336,20 +1333,6 @@ struct msdc_host {
 	atomic_t soft_reset;
 	bool need_lower_freq;
 	int irq;		/* host interrupt */
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	struct delayed_work metrics_work;
-	u32 crc_count_p; /* reported crc count */
-	u32 req_count_p;  /* reported request count */
-	u32 powertimeout_count_p; /* reported power timeout count */
-	u32 datatimeout_count_p; /* reported data timeout count */
-	u32 pc_count_p; /* reported power cycle count */
-	u32 pc_busy_p; /* reported busy programming count */
-	u32 pc_datatimeout_p; /* reported data timeout count */
-	u32 pc_crcsdr25_p; /* reported crc count in sdr25 mode */
-	u32 pc_suspend_p; /* reported suspend/resuem count */
-	u32 cmd19_fail_p; /* reported cmd19 tune failed count */
-	u32 inserted_times_p; /* reported card insert times */
-#endif
 
 	struct tasklet_struct card_tasklet;
 
@@ -1656,16 +1639,5 @@ static ssize_t msdc_attr_##name##_store(struct device *dev,			\
 static DEVICE_ATTR(name, S_IRUGO | S_IWUSR | S_IWGRP, msdc_attr_##name##_show, msdc_attr_##name##_store)
 extern int mmc_send_tuning(struct mmc_host *host);
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#define METRICS_DELAY HZ
-#define MSDC_LOG_COUNTER_TO_VITALS(name, value) \
-	do { \
-		if (value != value##_p) { \
-			log_counter_to_vitals(ANDROID_LOG_INFO, "Kernel", "Kernel", \
-				"SD", #name, value - value##_p, "count", NULL, VITALS_NORMAL); \
-			value##_p = value; \
-		} \
-	} while (0)
-#endif
 
 #endif /* __MTK_SD_H */

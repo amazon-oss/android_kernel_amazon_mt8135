@@ -50,9 +50,6 @@
 #include <linux/cyttsp4_core.h>
 #include <linux/cyttsp4_regs.h>
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#include <linux/metricslog.h>
-#endif
 
 /* Timeout in ms. */
 #define CY_CORE_REQUEST_EXCLUSIVE_TIMEOUT	500
@@ -2688,9 +2685,6 @@ static void cyttsp4_watchdog_work(struct work_struct *work)
 	u8 mode[2];
 	bool restart = false;
 	int rc;
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	char buf[128];
-#endif
 
 	if (cd == NULL) {
 		pr_err("%s: NULL context pointer\n", __func__);
@@ -2702,11 +2696,6 @@ static void cyttsp4_watchdog_work(struct work_struct *work)
 	if (rc) {
 		dev_err(cd->dev, "%s: failed to access device r=%d\n",
 			__func__, rc);
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		snprintf(buf, sizeof(buf),
-			"cyttsp4:watchdog:read_failure=1;CT;1:NR");
-		log_to_metrics(ANDROID_LOG_INFO, "TouchEvent", buf);
-#endif
 		restart = true;
 		rst_count++;
 		goto exit;
@@ -2715,11 +2704,6 @@ static void cyttsp4_watchdog_work(struct work_struct *work)
 	if (IS_BOOTLOADER(mode[0], mode[1])) {
 		dev_err(cd->dev, "%s: device found in bootloader mode\n",
 			__func__);
-#ifdef CONFIG_AMAZON_METRICS_LOG
-		snprintf(buf, sizeof(buf),
-			"cyttsp4:watchdog:bootloader=1;CT;1:NR");
-		log_to_metrics(ANDROID_LOG_INFO, "TouchEvent", buf);
-#endif
 		restart = true;
 		goto exit;
 	}

@@ -309,14 +309,6 @@ struct mmc_card {
 	struct mmc_part	part[MMC_NUM_PHY_PARTITION]; /* physical partitions */
 	unsigned int    nr_parts;
 	struct device_attribute card_lock_disable; /* user area write protect disable */
-
-#ifdef CONFIG_AMAZON_METRICS_LOG                /* for attribute */
-	unsigned int minReservedBlocks;
-	unsigned int maxEraseCountMLC;
-	unsigned int avgEraseCountMLC;
-	unsigned int maxEraseCountSLC;
-	unsigned int avgEraseCountSLC;
-#endif /* CONFIG_AMAZON_METRICS_LOG */
 };
 
 /*

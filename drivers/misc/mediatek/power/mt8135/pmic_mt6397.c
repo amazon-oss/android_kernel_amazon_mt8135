@@ -84,9 +84,6 @@
 
 #include <mach/mt_accdet.h>
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-#include <linux/metricslog.h>
-#endif
 
 #include <linux/gpio.h>
 #include <linux/irqdomain.h>
@@ -1383,23 +1380,11 @@ static irqreturn_t pwrkey_int_handler(int irq, void *dev_id)
 	U32 pwrkey_deb = 0;
 	ktime_t ktime;
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	char *action;
-	#define METRICS_STR_LEN 128
-	char buf[METRICS_STR_LEN];
-	#undef METRICS_STR_LEN
-#endif
 
 	pr_info("%s:\n", __func__);
 
 	pwrkey_deb = upmu_get_pwrkey_deb();
 
-#ifdef CONFIG_AMAZON_METRICS_LOG
-	action = (pwrkey_deb == 1) ? "release" : "press";
-	sprintf(buf, "%s:powi%c:report_action_is_%s=1;CT;1:NR", __func__,
-		 action[0], action);
-	log_to_metrics(ANDROID_LOG_INFO, "PowerKeyEvent", buf);
-#endif
 
 	if (pwrkey_deb == 1) {
 		pr_info("[Power/PMIC]"
