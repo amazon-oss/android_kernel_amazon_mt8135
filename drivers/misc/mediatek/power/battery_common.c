@@ -32,6 +32,7 @@
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/irq.h>
 #include <linux/types.h>
 #include <linux/wait.h>
 #include <linux/slab.h>
@@ -45,6 +46,7 @@
 #include <linux/kthread.h>
 #include <linux/proc_fs.h>
 #include <linux/platform_device.h>
+#include <linux/reboot.h>
 #include <linux/xlog.h>
 #include <linux/seq_file.h>
 #include <linux/thermal.h>
