@@ -126,7 +126,7 @@ static inline int lz4_compressctx(void *ctx,
 			int len;
 			*token = (RUN_MASK << ML_BITS);
 			len = length - RUN_MASK;
-			for (; len > 254; len -= 255)
+			for (; len > 254 ; len -= 255)
 				*op++ = 255;
 			*op++ = (u8)len;
 		} else
@@ -178,7 +178,7 @@ _endcount:
 		if (length >= (int)ML_MASK) {
 			*token += ML_MASK;
 			length -= ML_MASK;
-			for (; length > 509; length -= 510) {
+			for (; length > 509 ; length -= 510) {
 				*op++ = 255;
 				*op++ = 255;
 			}
@@ -223,7 +223,7 @@ _last_literals:
 	if (lastrun >= (int)RUN_MASK) {
 		*op++ = (RUN_MASK << ML_BITS);
 		lastrun -= RUN_MASK;
-		for (; lastrun > 254; lastrun -= 255)
+		for (; lastrun > 254 ; lastrun -= 255)
 			*op++ = 255;
 		*op++ = (u8)lastrun;
 	} else
@@ -280,7 +280,7 @@ static inline int lz4_compress64kctx(void *ctx,
 			ip = forwardip;
 			forwardip = ip + step;
 
-			if (unlikely(forwardip > mflimit))
+			if (forwardip > mflimit)
 				goto _last_literals;
 
 			forwardh = LZ4_HASH64K_VALUE(forwardip);
@@ -305,7 +305,7 @@ static inline int lz4_compress64kctx(void *ctx,
 		if (length >= (int)RUN_MASK) {
 			*token = (RUN_MASK << ML_BITS);
 			len = length - RUN_MASK;
-			for (; len > 254; len -= 255)
+			for (; len > 254 ; len -= 255)
 				*op++ = 255;
 			*op++ = (u8)len;
 		} else
@@ -361,7 +361,7 @@ _endcount:
 		if (len >= (int)ML_MASK) {
 			*token += ML_MASK;
 			len -= ML_MASK;
-			for (; len > 509; len -= 510) {
+			for (; len > 509 ; len -= 510) {
 				*op++ = 255;
 				*op++ = 255;
 			}
@@ -404,7 +404,7 @@ _last_literals:
 	if (lastrun >= (int)RUN_MASK) {
 		*op++ = (RUN_MASK << ML_BITS);
 		lastrun -= RUN_MASK;
-		for (; lastrun > 254; lastrun -= 255)
+		for (; lastrun > 254 ; lastrun -= 255)
 			*op++ = 255;
 		*op++ = (u8)lastrun;
 	} else
@@ -428,7 +428,7 @@ int lz4_compress(const unsigned char *src, size_t src_len,
 		out_len = lz4_compressctx(wrkmem, src, dst, src_len,
 				lz4_compressbound(src_len));
 
-	if (unlikely(out_len < 0))
+	if (out_len < 0)
 		goto exit;
 
 	*dst_len = out_len;

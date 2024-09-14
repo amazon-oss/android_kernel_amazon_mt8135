@@ -278,7 +278,7 @@ static inline int lz4_encodesequence(const u8 **ip, u8 **op, const u8 **anchor,
 	if (length >= (int)RUN_MASK) {
 		*token = (RUN_MASK << ML_BITS);
 		len = length - RUN_MASK;
-		for (; len > 254; len -= 255)
+		for (; len > 254 ; len -= 255)
 			*(*op)++ = 255;
 		*(*op)++ = (u8)len;
 	} else
@@ -295,7 +295,7 @@ static inline int lz4_encodesequence(const u8 **ip, u8 **op, const u8 **anchor,
 	if (len >= (int)ML_MASK) {
 		*token += ML_MASK;
 		len -= ML_MASK;
-		for (; len > 509; len -= 510) {
+		for (; len > 509 ; len -= 510) {
 			*(*op)++ = 255;
 			*(*op)++ = 255;
 		}
@@ -502,7 +502,7 @@ _search3:
 	if (lastrun >= (int)RUN_MASK) {
 		*op++ = (RUN_MASK << ML_BITS);
 		lastrun -= RUN_MASK;
-		for (; lastrun > 254; lastrun -= 255)
+		for (; lastrun > 254 ; lastrun -= 255)
 			*op++ = 255;
 		*op++ = (u8) lastrun;
 	} else

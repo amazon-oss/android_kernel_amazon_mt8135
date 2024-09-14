@@ -468,6 +468,7 @@ static void fiq_debugger_help(struct fiq_debugger_state *state)
 	if (fiq_kgdb_enable) {
 		fiq_debugger_printf(&state->output,
 			" kgdb          Enter kernel debugger\n");
+	}
 #endif
 }
 

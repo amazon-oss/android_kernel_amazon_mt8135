@@ -1,7 +1,7 @@
 /*
  * LZ4 Decompressor for Linux kernel
  *
- * Copyright (C) 2013, LG Electronics, Kyungsik Lee <kyungsik.lee@lge.com>
+ * Copyright (C) 2013 LG Electronics Co., Ltd. (http://www.lge.com/)
  *
  * Based on LZ4 implementation by Yann Collet.
  *
@@ -56,12 +56,13 @@ static int lz4_uncompress(const char *source, char *dest, int osize)
 	BYTE *cpy;
 	unsigned token;
 	size_t length;
-	const size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
+	size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
 #if LZ4_ARCH64
-	const size_t dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
+	size_t dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
 #endif
 
-	do {
+	while (1) {
+
 		/* get runlength */
 		token = *ip++;
 		length = (token >> ML_BITS);
@@ -83,7 +84,7 @@ static int lz4_uncompress(const char *source, char *dest, int osize)
 			 * Error: not enough place for another match
 			 * (min 4) + 5 literals
 			 */
-			if (unlikely(cpy != oend))
+			if (cpy != oend)
 				goto _output_error;
 
 			memcpy(op, ip, length);
@@ -136,7 +137,7 @@ static int lz4_uncompress(const char *source, char *dest, int osize)
 		if (cpy > (oend - COPYLENGTH)) {
 
 			/* Error: request to write beyond destination buffer */
-			if (unlikely(cpy > oend))
+			if (cpy > oend)
 				goto _output_error;
 			LZ4_SECURECOPY(ref, op, (oend - COPYLENGTH));
 			while (op < cpy)
@@ -146,13 +147,13 @@ static int lz4_uncompress(const char *source, char *dest, int osize)
 			 * Check EOF (should never happen, since last 5 bytes
 			 * are supposed to be literals)
 			 */
-			if (unlikely(op == oend))
+			if (op == oend)
 				goto _output_error;
 			continue;
 		}
 		LZ4_SECURECOPY(ref, op, cpy);
 		op = cpy; /* correction */
-	} while (1);
+	}
 	/* end of decoding */
 	return (int) (((char *)ip) - source);
 
@@ -168,28 +169,29 @@ static int lz4_uncompress_unknownoutputsize(const char *source, char *dest,
 	const BYTE *const iend = ip + isize;
 	const BYTE *ref;
 
+
 	BYTE *op = (BYTE *) dest;
 	BYTE * const oend = op + maxoutputsize;
 	BYTE *cpy;
 
-	const size_t dec32table[] = {4, 1, 2, 1, 4, 4, 4, 4};
+	size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
 #if LZ4_ARCH64
-	const size_t dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
+	size_t dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
 #endif
-	size_t length;
 
 	/* Main Loop */
 	while (ip < iend) {
 
+		unsigned token;
+		size_t length;
+
 		/* get runlength */
-		const unsigned token = *ip++;
+		token = *ip++;
 		length = (token >> ML_BITS);
 		if (length == RUN_MASK) {
-			unsigned int s = 255;
+			int s = 255;
 			while ((ip < iend) && (s == 255)) {
 				s = *ip++;
-				if (unlikely(length > (size_t)(length + s)))
-					goto _output_error;
 				length += s;
 			}
 		}
@@ -198,10 +200,10 @@ static int lz4_uncompress_unknownoutputsize(const char *source, char *dest,
 		if ((cpy > oend - COPYLENGTH) ||
 			(ip + length > iend - COPYLENGTH)) {
 
-			if (unlikely(cpy > oend))
+			if (cpy > oend)
 				goto _output_error;/* writes beyond buffer */
 
-			if (unlikely(ip + length != iend))
+			if (ip + length != iend)
 				goto _output_error;/*
 						    * Error: LZ4 format requires
 						    * to consume all input
@@ -218,7 +220,7 @@ static int lz4_uncompress_unknownoutputsize(const char *source, char *dest,
 		/* get offset */
 		LZ4_READ_LITTLEENDIAN_16(ref, cpy, ip);
 		ip += 2;
-		if (unlikely(ref < (BYTE * const) dest))
+		if (ref < (BYTE * const) dest)
 			goto _output_error;
 			/*
 			 * Error : offset creates reference
@@ -229,18 +231,12 @@ static int lz4_uncompress_unknownoutputsize(const char *source, char *dest,
 		length = (token & ML_MASK);
 		if (length == ML_MASK) {
 			while (ip < iend) {
-				const unsigned int s = *ip++;
-				if (unlikely(length > (size_t)(length + s)))
-					goto _output_error;
+				int s = *ip++;
 				length += s;
 				if (s == 255)
 					continue;
 				break;
 			}
-#ifndef LZ4_ARCH64
-			if (unlikely((size_t)(op + length) < (size_t)op))
-				goto _output_error;
-#endif
 		}
 
 		/* copy repeated sequence */
@@ -254,18 +250,18 @@ static int lz4_uncompress_unknownoutputsize(const char *source, char *dest,
 				op[1] = ref[1];
 				op[2] = ref[2];
 				op[3] = ref[3];
-				ref += dec32table[op - ref];
-				PUT4(ref, (op + 4));
-				op += STEPSIZE;
-#if LZ4_ARCH64
+				op += 4;
+				ref += 4;
+				ref -= dec32table[op - ref];
+				PUT4(ref, op);
+				op += STEPSIZE - 4;
 				ref -= dec64;
-#endif
 		} else {
 			LZ4_COPYSTEP(ref, op);
 		}
 		cpy = op + length - (STEPSIZE-4);
 		if (cpy > oend - COPYLENGTH) {
-			if (unlikely(cpy > oend))
+			if (cpy > oend)
 				goto _output_error; /* write outside of buf */
 
 			LZ4_SECURECOPY(ref, op, (oend - COPYLENGTH));
@@ -276,7 +272,7 @@ static int lz4_uncompress_unknownoutputsize(const char *source, char *dest,
 			 * Check EOF (should never happen, since last 5 bytes
 			 * are supposed to be literals)
 			 */
-			if (unlikely(op == oend))
+			if (op == oend)
 				goto _output_error;
 			continue;
 		}
@@ -288,20 +284,23 @@ static int lz4_uncompress_unknownoutputsize(const char *source, char *dest,
 
 	/* write overflow error detected */
 _output_error:
-	return -1;
+	return (int) (-(((char *) ip) - source));
 }
 
 int lz4_decompress(const unsigned char *src, size_t *src_len,
 		unsigned char *dest, size_t actual_dest_len)
 {
-	const int input_len = lz4_uncompress(src, dest, actual_dest_len);
-	if (unlikely(input_len < 0))
+	int ret = -1;
+	int input_len = 0;
+
+	input_len = lz4_uncompress(src, dest, actual_dest_len);
+	if (input_len < 0)
 		goto exit_0;
 	*src_len = input_len;
 
 	return 0;
 exit_0:
-	return -1;
+	return ret;
 }
 #ifndef STATIC
 EXPORT_SYMBOL(lz4_decompress);
@@ -310,15 +309,18 @@ EXPORT_SYMBOL(lz4_decompress);
 int lz4_decompress_unknownoutputsize(const unsigned char *src, size_t src_len,
 		unsigned char *dest, size_t *dest_len)
 {
-	const int out_len = lz4_uncompress_unknownoutputsize(src, dest, src_len,
+	int ret = -1;
+	int out_len = 0;
+
+	out_len = lz4_uncompress_unknownoutputsize(src, dest, src_len,
 					*dest_len);
-	if (unlikely(out_len < 0))
+	if (out_len < 0)
 		goto exit_0;
 	*dest_len = out_len;
 
 	return 0;
 exit_0:
-	return -1;
+	return ret;
 }
 #ifndef STATIC
 EXPORT_SYMBOL(lz4_decompress_unknownoutputsize);

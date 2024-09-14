@@ -280,6 +280,9 @@ static void mmc_select_card_type(struct mmc_card *card)
 	card->ext_csd.card_type = card_type;
 }
 
+/* Minimum partition switch timeout in milliseconds */
+#define MMC_MIN_PART_SWITCH_TIME	300
+
 /*
  * Decode extended CSD.
  */
@@ -345,6 +348,10 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 
 		/* EXT_CSD value is in units of 10ms, but we store in ms */
 		card->ext_csd.part_time = 10 * ext_csd[EXT_CSD_PART_SWITCH_TIME];
+		/* Some eMMC set the value too low so set a minimum */
+		if (card->ext_csd.part_time &&
+		    card->ext_csd.part_time < MMC_MIN_PART_SWITCH_TIME)
+			card->ext_csd.part_time = MMC_MIN_PART_SWITCH_TIME;
 
 		/* Sleep / awake timeout in 100ns units */
 		if (sa_shift > 0 && sa_shift <= 0x17)
@@ -1845,12 +1852,12 @@ static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
 		(can_sleep_notify ? EXT_CSD_SLEEP_NOTIFICATION : EXT_CSD_POWER_OFF_SHORT) :
 		EXT_CSD_POWER_OFF_LONG;
 
-	err = mmc_cache_ctrl(host, 0);
+	err = mmc_flush_cache(host->card);
 	if (err)
 		goto out;
 
 	if (mmc_can_poweroff_notify(host->card)) {
-		if (!is_suspend || (host->caps2 & MMC_CAP2_POWEROFF_NOTIFY))
+		if (!is_suspend || (host->caps2 & MMC_CAP2_FULL_PWR_CYCLE))
 			err = mmc_poweroff_notify(host->card, notify_type);
 		/* for 4.5 devices, we send POWEROFF_SHORT, CMD7/CMD5.
 		 * CMD7 cancels effect of POWEROFF_SHORT, and CMD5 enters low-power
