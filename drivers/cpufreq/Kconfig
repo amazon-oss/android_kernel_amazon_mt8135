@@ -45,16 +45,6 @@ config CPU_FREQ_STAT_DETAILS
 
 	  If in doubt, say N.
 
-config CPU_FREQ_STAT_PERSISTENT
-	bool "CPU frequency statistics that are *always* available"
-	depends on CPU_FREQ_STAT
-	default y
-	help
-	  This will always show detailed cpufreq stats under the cpufreq
-	  global sysfs object regardless of cpus being offline.
-
-	  If in doubt, say N.
-
 choice
 	prompt "Default CPUFreq governor"
 	default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ
