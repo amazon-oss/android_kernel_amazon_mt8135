@@ -97,19 +97,6 @@ config SW_SYNC_USER
 	  *WARNING* improper use of this can result in deadlocking kernel
 	  drivers from userspace.
 
-config AMAZON_LOG
-	bool "Amazon Log"
-	---help---
-	  Create a special Amazon Log area for all Amazon applications
-	default y
-
-config AMAZON_LOGD
-	bool "Amazon Logd"
-	depends on ANDROID_LOGGER
-	default N
-	---help---
-	device uses logd for logging
-
 source "drivers/staging/android/ion/Kconfig"
 
 source "drivers/staging/android/fiq_debugger/Kconfig"

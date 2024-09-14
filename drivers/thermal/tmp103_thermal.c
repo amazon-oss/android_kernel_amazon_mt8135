@@ -38,9 +38,6 @@
 #include <linux/platform_data/mtk_thermal.h>
 #include <linux/thermal_framework.h>
 
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-#include <linux/sign_of_life.h>
-#endif
 
 
 #include <mach/mt_board.h>
@@ -215,10 +212,6 @@ static int tmp103_thermal_notify(struct thermal_zone_device *thermal,
 	snprintf(data, sizeof(data), "%s", "SHUTDOWN_WARNING");
 	kobject_uevent_env(&thermal->device.kobj, KOBJ_CHANGE, envp);
 
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-	if (type == THERMAL_TRIP_CRITICAL)
-		life_cycle_set_thermal_shutdown_reason(THERMAL_SHUTDOWN_REASON_PCB);
-#endif
 	return 0;
 }
 static struct thermal_zone_device_ops tmp103_tz_dev_ops = {

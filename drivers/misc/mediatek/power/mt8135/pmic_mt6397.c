@@ -159,25 +159,6 @@ struct pmic_access_mutex_record {
 };
 static struct pmic_access_mutex_record access_mutex_record;
 
-#ifdef CONFIG_AMAZON_POWEROFF_LOG
-static void log_long_press_power_key(void)
-{
-	int rc;
-	char *argv[] = {
-		"/sbin/crashreport",
-		"long_press_power_key",
-		NULL
-	};
-
-	rc = call_usermodehelper(argv[0], argv, NULL, UMH_WAIT_EXEC);
-
-	if (rc < 0)
-		pr_err("call /sbin/crashreport failed, rc = %d\n", rc);
-
-	msleep(5000); /* 5s */
-}
-#endif /* CONFIG_AMAZON_POWEROFF_LOG */
-
 /* ============================================================================== */
 /* PMIC lock/unlock APIs */
 /* ============================================================================== */
@@ -956,9 +937,6 @@ static void deferred_restart(struct work_struct *dummy)
 		goto OUT;
 	} else {
 		pr_info("Long key press power off\n");
-#ifdef CONFIG_AMAZON_POWEROFF_LOG
-		log_long_press_power_key();
-#endif /* CONFIG_AMAZON_POWEROFF_LOG */
 		if (upmu_get_pwrkey_deb())
 			goto OUT;
 		sys_sync();

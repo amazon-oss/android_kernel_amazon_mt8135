@@ -27,10 +27,6 @@
 #include <linux/mdump.h>
 #endif
 
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-#include <linux/sign_of_life.h>
-#endif
-
 #define THREAD_INFO(sp) ((struct thread_info *) \
 				((unsigned long)(sp) & ~(THREAD_SIZE - 1)))
 
@@ -438,9 +434,6 @@ void aee_wdt_irq_info(void)
 #endif
 	rtc_mark_reboot_reason(RTC_REBOOT_REASON_SW_WDT);
 
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-	life_cycle_set_boot_reason(WARMBOOT_BY_KERNEL_WATCHDOG);
-#endif
 	BUG();
 }
 

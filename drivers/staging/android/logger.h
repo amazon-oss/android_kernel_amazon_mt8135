@@ -93,13 +93,6 @@ struct logger_entry {
 #define __SYSTEM_BUF_SIZE 256*1024
 #endif
 
-#ifdef CONFIG_AMAZON_KLOG_CONSOLE
-#ifndef __KERNEL_BUF_SIZE
-#define __KERNEL_BUF_SIZE 256*1024
-#endif
-#endif
-
-
 #else
 
 #ifndef __MAIN_BUF_SIZE
@@ -118,26 +111,12 @@ struct logger_entry {
 #define __SYSTEM_BUF_SIZE 64*1024
 #endif
 
-#ifdef CONFIG_AMAZON_KLOG_CONSOLE
-#ifndef __KERNEL_BUF_SIZE
-#define __KERNEL_BUF_SIZE 128*1024
-#endif
-#endif
-
-
 #endif
 
 #define LOGGER_LOG_RADIO	"log_radio"	/* radio-related messages */
 #define LOGGER_LOG_EVENTS	"log_events"	/* system/hardware events */
 #define LOGGER_LOG_SYSTEM	"log_system"	/* system/framework messages */
 #define LOGGER_LOG_MAIN		"log_main"	/* everything else */
-#ifdef CONFIG_AMAZON_KLOG_CONSOLE
-#define LOGGER_LOG_KERNEL   "log_kernel"  /* kernel message */
-#endif
-#ifdef CONFIG_AMAZON_LOG
-#define LOGGER_LOG_AMAZON_MAIN "log_amazon_main"       /* private buffer for amazon signed apk */
-#endif
-
 
 #define LOGGER_ENTRY_MAX_PAYLOAD	4076
 

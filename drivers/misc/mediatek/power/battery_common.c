@@ -3061,10 +3061,6 @@ static int battery_thermal_notify(struct thermal_zone_device *thermal,
 				int trip,
 				enum thermal_trip_type type)
 {
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-	if (type == THERMAL_TRIP_CRITICAL)
-		life_cycle_set_thermal_shutdown_reason(THERMAL_SHUTDOWN_REASON_BATTERY);
-#endif
 	return 0;
 }
 

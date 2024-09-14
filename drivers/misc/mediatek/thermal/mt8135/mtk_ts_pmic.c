@@ -10,10 +10,6 @@
 #include <linux/kobject.h>
 #include <linux/err.h>
 
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-#include <linux/sign_of_life.h>
-#endif
-
 #include <mach/system.h>
 #include "mach/mtk_thermal_monitor.h"
 #include "mach/mt_typedefs.h"
@@ -276,10 +272,6 @@ static int mtktspmic_get_crit_temp(struct thermal_zone_device *thermal, unsigned
 static int mtktspmic_thermal_notify(struct thermal_zone_device *thermal,
 				int trip, enum thermal_trip_type type)
 {
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-	if (type == THERMAL_TRIP_CRITICAL)
-		life_cycle_set_thermal_shutdown_reason(THERMAL_SHUTDOWN_REASON_PMIC);
-#endif
 	return 0;
 }
 

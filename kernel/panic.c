@@ -32,10 +32,6 @@
 int g_kernel_panic;
 #endif
 
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-#include <linux/sign_of_life.h>
-#endif
-
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
 
@@ -128,9 +124,6 @@ void panic(const char *fmt, ...)
 	g_kernel_panic = 1;
 #endif
 
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-	life_cycle_set_boot_reason(WARMBOOT_BY_KERNEL_PANIC);
-#endif
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	/*

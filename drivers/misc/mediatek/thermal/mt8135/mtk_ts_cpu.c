@@ -18,10 +18,6 @@
 #include <mach/mt_irq.h>
 #include <mach/system.h>
 
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-#include <linux/sign_of_life.h>
-#endif
-
 #include "mach/mt_typedefs.h"
 #include "mach/mt_thermal.h"
 #include "mach/mt_cpufreq.h"
@@ -782,10 +778,6 @@ static int mtktscpu_get_crit_temp(struct thermal_zone_device *thermal, unsigned 
 static int mtktscpu_thermal_notify(struct thermal_zone_device *thermal,
 				int trip, enum thermal_trip_type type)
 {
-#ifdef CONFIG_AMAZON_SIGN_OF_LIFE
-	if (type == THERMAL_TRIP_CRITICAL)
-		life_cycle_set_thermal_shutdown_reason(THERMAL_SHUTDOWN_REASON_SOC);
-#endif
 	return 0;
 }
 
