@@ -3195,7 +3195,7 @@ static ssize_t show_FG_CV_Voltage_Reduction_Supported(struct device *dev, struct
 	return sprintf(buf, "%d\n", gFG_CV_Voltage_Reduction_Supported);
 }
 
-static DEVICE_ATTR(FG_CV_Voltage_Reduction_Supported, 0644, show_FG_CV_Voltage_Reduction_Supported, NULL);
+static DEVICE_ATTR(FG_CV_Voltage_Reduction_Supported, S_IRUGO, show_FG_CV_Voltage_Reduction_Supported, NULL);
 
 /* ------------------------------------------------------------------------------------------- */
 
