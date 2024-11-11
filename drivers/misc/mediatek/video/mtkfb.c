@@ -1062,7 +1062,7 @@ static int mtkfb_set_par(struct fb_info *fbi)
 	fb_layer.src_pitch = ALIGN_TO(var->xres, MTK_FB_ALIGNMENT);
 #else
 	if (get_boot_mode() == META_BOOT || get_boot_mode() == FACTORY_BOOT
-	    || get_boot_mode() == ADVMETA_BOOT || get_boot_mode() == RECOVERY_BOOT)
+	    || get_boot_mode() == ADVMETA_BOOT || get_boot_mode() == RECOVERY_BOOT || g_boot_reason == BR_USB)
 		fb_layer.src_pitch = ALIGN_TO(var->xres, MTK_FB_ALIGNMENT);
 	else
 		fb_layer.src_pitch = var->xres;
@@ -2697,10 +2697,10 @@ static int mtkfb_probe(struct device *dev)
 
 
 	if (get_boot_mode() == META_BOOT || get_boot_mode() == FACTORY_BOOT
-	    || get_boot_mode() == ADVMETA_BOOT || get_boot_mode() == RECOVERY_BOOT)
+	    || get_boot_mode() == ADVMETA_BOOT || get_boot_mode() == RECOVERY_BOOT || g_boot_reason == BR_USB)
 		first_update = false;
 
-	if (get_boot_mode() == NORMAL_BOOT)
+	if (get_boot_mode() == NORMAL_BOOT && g_boot_reason != BR_USB)
 		fgFreeReservedBuf = true;
 
 	pr_info("%s, %s\n", __func__, saved_command_line);
